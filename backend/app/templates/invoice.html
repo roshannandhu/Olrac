@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ invoice_id }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 14mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --primary: {{ primary_color or '#334155' }};
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #0f172a;
+      background: #f5f7fa;
+    }
+
+    .sheet {
+      width: 100%;
+      background: #ffffff;
+      border: 1px solid #d7dee8;
+      border-radius: 20px;
+      padding: 28px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .logo-wrap {
+      width: 58px;
+      height: 58px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-wrap img,
+    .seal-wrap img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .company-name {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .invoice-meta {
+      min-width: 210px;
+      text-align: right;
+    }
+
+    .invoice-title {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+
+    .meta-line {
+      margin-top: 6px;
+      font-size: 13px;
+      color: #475569;
+    }
+
+    .divider {
+      height: 1px;
+      background: #d7dee8;
+      margin: 22px 0;
+    }
+
+    .two-column {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 36px;
+    }
+
+    .section-title {
+      margin: 0 0 14px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .detail-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .detail-row {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 12px;
+      align-items: center;
+      font-size: 14px;
+    }
+
+    .detail-label {
+      color: #64748b;
+      font-weight: 700;
+    }
+
+    .detail-value {
+      color: #0f172a;
+      min-width: 0;
+      word-break: break-word;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }
+
+    .status-pending {
+      background: #ffedd5;
+      border-color: #fdba74;
+      color: #c2410c;
+    }
+
+    .status-approved {
+      background: #dcfce7;
+      border-color: #86efac;
+      color: #166534;
+    }
+
+    .status-rejected {
+      background: #ffe4e6;
+      border-color: #fda4af;
+      color: #be185d;
+    }
+
+    .status-completed {
+      background: #e0f2fe;
+      border-color: #7dd3fc;
+      color: #0369a1;
+    }
+
+    .pricing-section {
+      margin-top: 24px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .pricing-table thead th {
+      background: var(--primary);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: left;
+      padding: 12px 14px;
+    }
+
+    .pricing-table thead th:first-child {
+      border-top-left-radius: 12px;
+    }
+
+    .pricing-table thead th:last-child {
+      border-top-right-radius: 12px;
+    }
+
+    .pricing-table tbody td {
+      padding: 14px;
+      font-size: 14px;
+      border-bottom: 1px solid #d7dee8;
+      border-left: 1px solid #d7dee8;
+      background: #ffffff;
+    }
+
+    .pricing-table tbody td:last-child {
+      border-right: 1px solid #d7dee8;
+    }
+
+    .pricing-table tbody tr:last-child td:first-child {
+      border-bottom-left-radius: 12px;
+    }
+
+    .pricing-table tbody tr:last-child td:last-child {
+      border-bottom-right-radius: 12px;
+    }
+
+    .align-center {
+      text-align: center;
+    }
+
+    .align-right {
+      text-align: right;
+    }
+
+    .total-row-wrap {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 14px;
+    }
+
+    .total-row {
+      width: 280px;
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .summary-section {
+      margin-top: 24px;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .info-card {
+      border: 1px solid #d7dee8;
+      border-radius: 12px;
+      background: #f8fafc;
+      padding: 12px 14px;
+    }
+
+    .info-card h4 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+
+    .info-card p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #334155;
+      white-space: pre-wrap;
+    }
+
+    .summary-box {
+      width: 100%;
+      border: 1px solid #d7dee8;
+      border-radius: 12px;
+      background: #f8fafc;
+      padding: 14px 16px;
+      height: auto;
+      overflow: visible;
+    }
+
+    .summary-text {
+      margin: 0;
+      margin-top: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #334155;
+      max-width: 100%;
+      white-space: pre-wrap;
+      overflow: visible;
+      overflow-wrap: break-word;
+      word-wrap: break-word;
+      word-break: break-word;
+      height: auto;
+      display: block;
+    }
+
+    .signature {
+      display: grid;
+      grid-template-columns: 96px 1fr;
+      gap: 18px;
+      align-items: end;
+      margin-top: 24px;
+    }
+
+    .seal-wrap {
+      width: 80px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .signature-text {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .signature-line {
+      margin-top: 12px;
+      height: 1px;
+      background: #0f172a;
+      width: 180px;
+    }
+
+    .footer {
+      margin-top: 24px;
+      padding-top: 18px;
+      border-top: 1px solid #d7dee8;
+      text-align: center;
+      color: #64748b;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="header">
+      <div class="brand">
+        <div class="logo-wrap">
+          {% if logo_url %}
+          <img src="{{ logo_url }}" alt="Logo" />
+          {% endif %}
+        </div>
+        <h1 class="company-name">{{ company_name }}</h1>
+      </div>
+      <div class="invoice-meta">
+        <h2 class="invoice-title">{{ invoice_title }}</h2>
+        <div class="meta-line">Invoice ID: {{ invoice_id }}</div>
+        <div class="meta-line">Date: {{ invoice_date }}</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="two-column">
+      <div>
+        <h3 class="section-title">Client Details</h3>
+        <div class="detail-grid">
+          <div class="detail-row"><div class="detail-label">Name</div><div class="detail-value">{{ client_name }}</div></div>
+          <div class="detail-row"><div class="detail-label">Company</div><div class="detail-value">{{ client_company }}</div></div>
+          <div class="detail-row"><div class="detail-label">Phone</div><div class="detail-value">{{ client_phone }}</div></div>
+        </div>
+      </div>
+      <div>
+        <h3 class="section-title">Booking Details</h3>
+        <div class="detail-grid">
+          <div class="detail-row"><div class="detail-label">Location</div><div class="detail-value">{{ location }}</div></div>
+          <div class="detail-row"><div class="detail-label">Date</div><div class="detail-value">{{ booking_date }}</div></div>
+          <div class="detail-row"><div class="detail-label">Time Slot</div><div class="detail-value">{{ time_slot }}</div></div>
+          {% if show_slot_details %}
+          <div class="detail-row"><div class="detail-label">Slots Booked</div><div class="detail-value">{{ slot_quantity }}</div></div>
+          {% endif %}
+          <div class="detail-row">
+            <div class="detail-label">Status</div>
+            <div class="detail-value"><span class="status-badge {{ status_class }}">{{ status_label }}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pricing-section">
+      <h3 class="section-title">Pricing Table</h3>
+      <table class="pricing-table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th class="align-center">Quantity</th>
+            <th class="align-right">Amount</th>
+            <th class="align-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Ad Slot Booking{% if show_slot_details %} ({{ slot_quantity }} slots, {{ time_slot }}){% endif %}</td>
+            <td class="align-center">{{ quantity }}</td>
+            <td class="align-right">{{ amount }}</td>
+            <td class="align-right"><strong>{{ total }}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="total-row-wrap">
+        <div class="total-row">
+          <span>Total</span>
+          <span>{{ total }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary-section">
+      <h3 class="section-title">Summary</h3>
+      <div class="summary-box">
+        <p class="summary-text">{{ summary }}</p>
+      </div>
+    </div>
+
+    {% if notes or payment_terms or bank_name or account_name or account_number or ifsc or upi %}
+    <div class="info-grid">
+      {% if notes %}
+      <div class="info-card">
+        <h4>Notes</h4>
+        <p>{{ notes }}</p>
+      </div>
+      {% endif %}
+
+      {% if payment_terms %}
+      <div class="info-card">
+        <h4>Payment Terms</h4>
+        <p>{{ payment_terms }}</p>
+      </div>
+      {% endif %}
+
+      {% if bank_name or account_name or account_number or ifsc or upi %}
+      <div class="info-card">
+        <h4>Payment Details</h4>
+        <p>
+          {% if bank_name %}Bank: {{ bank_name }}<br />{% endif %}
+          {% if account_name %}Account Name: {{ account_name }}<br />{% endif %}
+          {% if account_number %}Account No.: {{ account_number }}<br />{% endif %}
+          {% if ifsc %}IFSC: {{ ifsc }}<br />{% endif %}
+          {% if upi %}UPI: {{ upi }}{% endif %}
+        </p>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="signature">
+      <div class="seal-wrap">
+        {% if seal_image and show_seal %}
+        <img src="{{ seal_image }}" alt="Seal" />
+        {% endif %}
+      </div>
+      <div class="signature-text">
+        <div>{{ signature_name }}</div>
+        <div>{{ signature_title }}</div>
+        <div class="signature-line"></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div>Thank you for choosing {{ company_name }}.</div>
+      <div>{{ contact_email }}{% if contact_phone %} | {{ contact_phone }}{% endif %}</div>
+      {% if address %}<div>{{ address }}</div>{% endif %}
+      {% if gst_number %}<div>GST: {{ gst_number }}</div>{% endif %}
+      {% if footer_note %}<div>{{ footer_note }}</div>{% endif %}
+    </div>
+  </div>
+</body>
+</html>
