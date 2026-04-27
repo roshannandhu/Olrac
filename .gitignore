@@ -59,7 +59,11 @@ localtunnel.log
 .claude/
 
 # Uploaded media files
-backend/uploads/
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Backend env
+backend/.env
 
 # Debug
 backend/pdf_debug.txt
