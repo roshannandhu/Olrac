@@ -95,24 +95,26 @@ export default function Navbar() {
         <div className="flex h-[68px] items-center justify-between md:h-[80px]">
 
           {/* Logo */}
-          <Link to="/" className="group flex shrink-0 items-center gap-2.5 md:gap-3.5">
+          <Link to="/" className="group flex shrink-0 items-center gap-3 md:gap-4">
             {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt={appName}
-                className={`${isAdminSite ? 'h-10' : 'h-11 md:h-14'} w-auto object-contain transition-all group-hover:scale-105`}
-              />
+              <div className={`${isAdminSite ? 'h-10 w-10' : 'h-11 w-11 md:h-13 md:w-13'} rounded-2xl overflow-hidden shrink-0 ring-1 ring-white/10 shadow-[0_2px_16px_rgba(0,0,0,0.45)] transition-all duration-300 group-hover:scale-105 group-hover:ring-white/25 group-hover:shadow-[0_4px_24px_rgba(0,0,0,0.6)]`}>
+                <img
+                  src={logoUrl}
+                  alt={appName}
+                  className="w-full h-full object-cover"
+                />
+              </div>
             ) : (
-              <div className={`${isAdminSite ? 'h-10 w-10' : 'h-11 w-11 md:h-14 md:w-14'} rounded-2xl flex items-center justify-center shadow-sm overflow-hidden transition-all group-hover:scale-105 ${isAdminSite
-                  ? 'bg-gradient-to-br from-primary-600 to-primary-700'
+              <div className={`${isAdminSite ? 'h-10 w-10' : 'h-11 w-11 md:h-13 md:w-13'} rounded-2xl flex items-center justify-center shrink-0 ring-1 ring-white/10 shadow-[0_2px_16px_rgba(0,0,0,0.45)] transition-all duration-300 group-hover:scale-105 ${isAdminSite
+                  ? 'bg-gradient-to-br from-violet-600 to-indigo-700'
                   : isTransparent
-                    ? 'bg-white/10 border border-white/20'
-                    : 'bg-blue-700/80 border border-blue-600/30'
+                    ? 'bg-white/10'
+                    : 'bg-gradient-to-br from-blue-700 to-indigo-800'
                 }`}>
-                <Monitor className="w-6 h-6 text-white" />
+                <Monitor className="w-5 h-5 text-white" />
               </div>
             )}
-            <span className={`max-w-[170px] truncate text-[1.02rem] font-black leading-none tracking-tight transition-colors sm:text-[1.2rem] md:max-w-none md:text-[1.65rem] ${logoTextColor}`}>
+            <span className={`max-w-[160px] truncate text-[1rem] font-black leading-none tracking-tight transition-colors sm:text-[1.15rem] md:max-w-none md:text-[1.55rem] ${logoTextColor}`}>
               {appName}
             </span>
           </Link>
