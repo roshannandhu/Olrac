@@ -269,7 +269,7 @@ export default function QuotationEditor({ booking, onClose }) {
 
         <div className="flex items-center gap-1.5 text-xs text-slate-400">
           {saving ? (
-            <><Loader2 className="h-3 w-3 animate-spin" /> Savingâ€¦</>
+            <><Loader2 className="h-3 w-3 animate-spin" /> Saving...</>
           ) : savedFlash ? (
             <><CheckCircle className="h-3 w-3 text-emerald-500 shrink-0" /><span className="text-emerald-600">Saved</span></>
           ) : (
@@ -362,7 +362,7 @@ export default function QuotationEditor({ booking, onClose }) {
               value={qData.campaign_name}
               onChange={v => update('campaign_name', v)}
               className="text-[13px] font-bold text-blue-600"
-              placeholder="Enter campaign nameâ€¦"
+              placeholder="Enter campaign name..."
             />
           </div>
           <div>
@@ -378,7 +378,7 @@ export default function QuotationEditor({ booking, onClose }) {
                 className="text-[13px] font-medium text-slate-700"
                 placeholder="dd-mm-yyyy"
               />
-              <span className="text-slate-400 shrink-0">â€“</span>
+              <span className=”text-slate-400 shrink-0”>-</span>
               <EField
                 value={qData.duration_end}
                 onChange={v => update('duration_end', v)}
@@ -570,7 +570,7 @@ export default function QuotationEditor({ booking, onClose }) {
                 style={{ background: 'linear-gradient(135deg,#7c3aed,#6366f1)' }}
               >
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                {sending ? 'Sendingâ€¦' : 'Send Now'}
+                {sending ? 'Sending...' : 'Send Now'}
               </button>
             </div>
           </div>
