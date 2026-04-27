@@ -4,6 +4,8 @@ import {
   BarChart3,
   Brain,
   Download,
+  ExternalLink,
+  Globe,
   LayoutDashboard,
   Lightbulb,
   MapPin,
@@ -95,6 +97,7 @@ export default function AdminInsights() {
   const [topLocations, setTopLocations] = useState([])
   const [bookingStatus, setBookingStatus] = useState([])
   const [timeSlotUsage, setTimeSlotUsage] = useState([])
+  const [topCustomers, setTopCustomers] = useState({ data: [], clients: [] })
   const [dashboardSummary, setDashboardSummary] = useState(null)
   const [aiHighlights, setAiHighlights] = useState([])
   const [aiDetails, setAiDetails] = useState([])
@@ -108,6 +111,10 @@ export default function AdminInsights() {
   const [includeTitle, setIncludeTitle] = useState(true)
   const [includeDateRange, setIncludeDateRange] = useState(true)
   const [resolution, setResolution] = useState('high')
+
+  const [phData, setPhData] = useState(null)
+  const [phLoading, setPhLoading] = useState(false)
+  const [phError, setPhError] = useState('')
 
   const chartRefs = useRef({})
   const analyticsExportRef = useRef(null)
@@ -137,13 +144,14 @@ export default function AdminInsights() {
   const fetchInsights = useCallback(async () => {
     setLoading(true)
     try {
-      const [summaryRes, trendRes, revenueRes, locationsRes, statusRes, slotsRes] = await Promise.all([
+      const [summaryRes, trendRes, revenueRes, locationsRes, statusRes, slotsRes, customersRes] = await Promise.all([
         api.get('/admin/dashboard-summary'),
         api.get('/admin/insights/bookings-trend'),
         api.get('/admin/insights/revenue-analysis'),
         api.get('/admin/insights/top-locations'),
         api.get('/admin/insights/booking-status'),
         api.get('/admin/insights/time-slot-usage'),
+        api.get('/admin/insights/top-customers'),
       ])
 
       setDashboardSummary(summaryRes.data)
@@ -152,6 +160,7 @@ export default function AdminInsights() {
       setTopLocations(locationsRes.data)
       setBookingStatus(statusRes.data)
       setTimeSlotUsage(slotsRes.data)
+      setTopCustomers(customersRes.data)
       setError('')
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to load insights')
@@ -198,9 +207,28 @@ export default function AdminInsights() {
     }
   }, [dashboardSummary, approved, pending, rejected, bookingsTrend, topLocations, revenueAnalysis, timeSlotUsage])
 
+  const fetchPhAnalytics = useCallback(async () => {
+    setPhLoading(true)
+    setPhError('')
+    try {
+      const res = await api.get('/admin/posthog/web-analytics')
+      setPhData(res.data)
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Failed to load PostHog analytics'
+      setPhError(msg)
+      setPhData(null)
+    } finally {
+      setPhLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     fetchInsights()
   }, [fetchInsights])
+
+  useEffect(() => {
+    fetchPhAnalytics()
+  }, [fetchPhAnalytics])
 
   useEffect(() => {
     if (dashboardSummary) {
@@ -233,6 +261,14 @@ export default function AdminInsights() {
       key: 'timeSlotUsage',
       title: 'Time Slot Usage',
       lines: timeSlotUsage.map((item) => `${item.label}: ${item.count}`),
+    },
+    {
+      key: 'topCustomers',
+      title: 'Top Customers per Screen',
+      lines: topCustomers.data.map((item) => {
+        const clientShares = topCustomers.clients.map(c => item[c] ? `${c}: ${item[c]}` : '').filter(Boolean)
+        return `${item.label} -> ${clientShares.join(', ')}`
+      }),
     },
   ]
 
@@ -393,6 +429,12 @@ export default function AdminInsights() {
       'Time Slot Usage',
       'Label,Count',
       ...timeSlotUsage.map((item) => `${item.label},${item.count}`),
+      '',
+      'Top Customers per Screen',
+      `Screen,${topCustomers.clients.join(',')}`,
+      ...topCustomers.data.map((item) => {
+        return `${item.label},${topCustomers.clients.map(c => item[c] || 0).join(',')}`
+      }),
     ].filter(Boolean)
 
     const blob = new Blob([sections.join('\n')], { type: 'text/csv;charset=utf-8;' })
@@ -434,7 +476,8 @@ export default function AdminInsights() {
         <div className="relative">
           <button
             onClick={() => setShowExportPanel((value) => !value)}
-            className="inline-flex items-center gap-2 px-5 py-3 bg-gray-900 text-white rounded-xl font-semibold shadow-sm hover:bg-black transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-90"
+            style={{ background: 'linear-gradient(135deg, #7c3aed, #6366f1)' }}
           >
             <Download className="w-4 h-4" />
             Download Insights
@@ -629,29 +672,62 @@ export default function AdminInsights() {
               </div>
             </div>
 
-            <div ref={setChartRef('timeSlotUsage')}>
-              <InsightsChartCard
-                title="Time Slot Usage"
-                description="Current slot usage grouped by booking cadence until explicit hour-based scheduling is added."
-              >
-                {timeSlotUsage.length ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={timeSlotUsage}>
-                      <CartesianGrid stroke="#eef2f7" strokeDasharray="4 4" />
-                      <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
-                      <YAxis allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
-                      <Tooltip formatter={(value) => `${value} slots`} />
-                      <Bar dataKey="count" radius={[10, 10, 0, 0]}>
-                        {timeSlotUsage.map((entry, index) => (
-                          <Cell key={`${entry.label}-${index}`} fill={['#2563eb', '#0f766e', '#7c3aed'][index % 3]} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div ref={setChartRef('timeSlotUsage')}>
+                <InsightsChartCard
+                  title="Time Slot Usage"
+                  description="Current slot usage grouped by booking cadence until explicit hour-based scheduling is added."
+                >
+                  {timeSlotUsage.length ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={timeSlotUsage}>
+                        <CartesianGrid stroke="#eef2f7" strokeDasharray="4 4" />
+                        <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
+                        <YAxis allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
+                        <Tooltip formatter={(value) => `${value} slots`} />
+                        <Bar dataKey="count" radius={[10, 10, 0, 0]}>
+                          {timeSlotUsage.map((entry, index) => (
+                            <Cell key={`${entry.label}-${index}`} fill={['#2563eb', '#0f766e', '#7c3aed'][index % 3]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <ChartEmptyState label="No slot usage data yet" />
+                  )}
+                </InsightsChartCard>
+              </div>
+
+              <div ref={setChartRef('topCustomers')}>
+                <InsightsChartCard
+                  title="Screen Selection by Customer"
+                  description="Top 5 screens showing usage breakdown across individual clients."
+                >
+                  {topCustomers.data.length ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={topCustomers.data} layout="vertical" margin={{ left: 12 }}>
+                        <CartesianGrid stroke="#eef2f7" strokeDasharray="4 4" horizontal={false} />
+                        <XAxis type="number" allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
+                        <YAxis dataKey="label" type="category" width={140} tick={{ fill: '#334155', fontSize: 12 }} axisLine={false} tickLine={false} />
+                        <Tooltip cursor={{ fill: '#f8fafc' }} />
+                        {topCustomers.clients.map((client, index) => (
+                          <Bar 
+                            key={client} 
+                            dataKey={client} 
+                            stackId="a" 
+                            fill={['#2563eb', '#10b981', '#f59e0b', '#7c3aed', '#ec4899', '#06b6d4'][index % 6]} 
+                            radius={
+                               index === topCustomers.clients.length - 1 ? [0, 6, 6, 0] : [0, 0, 0, 0]
+                            }
+                          />
                         ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <ChartEmptyState label="No slot usage data yet" />
-                )}
-              </InsightsChartCard>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <ChartEmptyState label="No customer screen usage data yet" />
+                  )}
+                </InsightsChartCard>
+              </div>
             </div>
           </div>
 

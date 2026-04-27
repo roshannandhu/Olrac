@@ -10,67 +10,73 @@ export default function AdminWorkspaceLayout({
   children,
 }) {
   return (
-    <div className="page-container max-w-[1400px] mx-auto px-4 py-8 animate-fade-in bg-[#fafafa] min-h-screen">
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight flex items-center gap-3">
-            {Icon ? <Icon className="w-8 h-8 text-primary-600" /> : null}
-            {title}
-          </h1>
-          {description ? (
-            <p className="text-sm text-gray-500 mt-2 font-medium">{description}</p>
-          ) : null}
+    <div className="min-h-screen bg-slate-50">
+      {/* Top header bar */}
+      <div className="border-b border-slate-200 bg-white px-6 py-5 lg:px-8">
+        <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            {Icon && (
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-white shrink-0"
+                style={{ background: 'linear-gradient(135deg, #7c3aed, #6366f1)' }}
+              >
+                <Icon className="w-5 h-5" />
+              </div>
+            )}
+            <div>
+              <h1 className="text-xl font-black text-slate-900 tracking-tight">{title}</h1>
+              {description && <p className="text-sm text-slate-500 mt-0.5">{description}</p>}
+            </div>
+          </div>
+          {action && <div>{action}</div>}
         </div>
-        {action}
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
-        <aside className="lg:w-72 flex-shrink-0">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 sticky top-24">
-            <nav className="space-y-1">
-              {sections.map((section) => {
-                const SectionIcon = section.icon
-                const isActive = activeSection === section.id
-
-                return (
-                  <Link
-                    key={section.id}
-                    to={section.to}
-                    className={`w-full flex items-start gap-3 px-4 py-3 rounded-xl transition-colors ${
-                      isActive
-                        ? 'bg-primary-50 text-primary-700'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
-                  >
-                    <SectionIcon className={`w-5 h-5 mt-0.5 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold">{section.label}</span>
-                      {section.description ? (
-                        <span className="block text-xs text-gray-500 mt-1">{section.description}</span>
-                      ) : null}
-                    </span>
-                  </Link>
-                )
-              })}
-            </nav>
-          </div>
-        </aside>
-
-        <section className="flex-1">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-[500px]">
-            <div className="px-8 py-6 border-b border-gray-100 bg-gray-50/50">
-              <h2 className="text-xl font-bold text-gray-900">
-                {sections.find((section) => section.id === activeSection)?.label || title}
-              </h2>
-              {sections.find((section) => section.id === activeSection)?.description ? (
-                <p className="text-sm text-gray-500 mt-1">
-                  {sections.find((section) => section.id === activeSection)?.description}
-                </p>
-              ) : null}
+      <div className="max-w-[1400px] mx-auto px-4 py-6 lg:px-8">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Sidebar */}
+          <aside className="lg:w-56 shrink-0">
+            <div className="rounded-2xl border border-slate-200 bg-white p-2 sticky top-[88px] shadow-sm">
+              <nav className="space-y-0.5">
+                {sections.map((section) => {
+                  const SectionIcon = section.icon
+                  const isActive = activeSection === section.id
+                  return (
+                    <Link
+                      key={section.id}
+                      to={section.to}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all ${
+                        isActive
+                          ? 'bg-violet-600 text-white shadow-sm'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                      }`}
+                    >
+                      <SectionIcon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                      <span className="text-sm font-semibold">{section.label}</span>
+                    </Link>
+                  )
+                })}
+              </nav>
             </div>
-            <div className="p-8">{children}</div>
-          </div>
-        </section>
+          </aside>
+
+          {/* Main content */}
+          <section className="flex-1 min-w-0">
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden min-h-[500px]">
+              <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/60">
+                <h2 className="text-base font-bold text-slate-900">
+                  {sections.find((s) => s.id === activeSection)?.label || title}
+                </h2>
+                {sections.find((s) => s.id === activeSection)?.description && (
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    {sections.find((s) => s.id === activeSection)?.description}
+                  </p>
+                )}
+              </div>
+              <div className="p-6 lg:p-8">{children}</div>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   )

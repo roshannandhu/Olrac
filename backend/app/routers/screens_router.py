@@ -19,17 +19,17 @@ def _screen_to_out(screen: Screen) -> dict:
         "area": screen.area,
         "description": screen.description,
         "footfall": screen.footfall,
-        "price_daily": float(screen.price_daily or 0),
-        "price_weekly": float(screen.price_weekly or 0),
-        "price_monthly": float(screen.price_monthly or 0),
-        "price_yearly": float(screen.price_yearly or 0),
+        "base_price": float(screen.base_price or 0),
+        "price_unit": screen.price_unit,
         "total_slots": screen.total_slots,
         "booked_slots": screen.booked_slots,
         "available_slots": screen.available_slots,
         "latitude": float(screen.latitude) if screen.latitude is not None else None,
         "longitude": float(screen.longitude) if screen.longitude is not None else None,
         "image_url": screen.image_url,
+        "promo_video_url": screen.promo_video_url,
         "additional_images": screen.additional_images or [],
+        "gallery_order": screen.gallery_order or [],
         "is_active": screen.is_active,
         "created_at": screen.created_at,
     }
@@ -41,7 +41,6 @@ def list_screens(db: Session = Depends(get_db)):
     screens = (
         db.query(Screen)
         .filter(Screen.is_active == True)
-        .filter(Screen.booked_slots < Screen.total_slots)
         .order_by(Screen.created_at.asc(), Screen.id.asc())
         .all()
     )
@@ -74,5 +73,20 @@ def get_public_settings(db: Session = Depends(get_db)):
             "invoice_logo_url": merged["config"].get("invoice_logo_url", ""),
             "invoice_seal_url": merged["config"].get("invoice_seal_url", ""),
             "whatsapp_enable": merged["config"].get("whatsapp_enable", True),
+            "whatsapp_template": merged["config"].get("whatsapp_template", ""),
+            "whatsapp_message_format": merged["config"].get("whatsapp_message_format", "text"),
+            "hero_billboard_media": merged["config"].get("hero_billboard_media", []),
+            "booking_durations": merged["config"].get("booking_durations", []),
+            "booking_default_duration_id": merged["config"].get("booking_default_duration_id", "d3"),
+            "booking_base_slot_duration_seconds": merged["config"].get("booking_base_slot_duration_seconds", 20),
+            "booking_method_whatsapp": merged["config"].get("booking_method_whatsapp", True),
+            "booking_method_email": merged["config"].get("booking_method_email", True),
+            "security_otp_booking_enable": merged["config"].get("security_otp_booking_enable", True),
+            "posthog_public_key": merged["config"].get("posthog_public_key", ""),
+            "posthog_host": merged["config"].get("posthog_host", "https://us.posthog.com"),
+            "contact_instagram_url": merged["config"].get("contact_instagram_url", ""),
+            "contact_facebook_url": merged["config"].get("contact_facebook_url", ""),
+            "contact_linkedin_url": merged["config"].get("contact_linkedin_url", ""),
+            "contact_map_url": merged["config"].get("contact_map_url", ""),
         },
     }

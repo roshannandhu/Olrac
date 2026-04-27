@@ -136,6 +136,45 @@ npm run build:client # Build client to dist/client
 npm run build:admin  # Build admin to dist/admin
 ```
 
+## Cloudflare Custom Domains
+
+To expose the two frontend sites on your own domain with a Named Cloudflare Tunnel, use this mapping:
+
+- `https://olrac.com` -> client frontend on `http://127.0.0.1:5173`
+- `https://admin.olrac.com` -> admin frontend on `http://127.0.0.1:5174`
+
+Before starting the tunnel, make sure the following local services are already running:
+
+- Backend on `http://127.0.0.1:8001`
+- Client frontend on `http://127.0.0.1:5173`
+- Admin frontend on `http://127.0.0.1:5174`
+
+Authenticate `cloudflared` and create the tunnel:
+
+```powershell
+.tools\cloudflared.exe tunnel login
+.tools\cloudflared.exe tunnel create olrac-sites
+.tools\cloudflared.exe tunnel route dns olrac-sites olrac.com
+.tools\cloudflared.exe tunnel route dns olrac-sites admin.olrac.com
+```
+
+Use the tunnel UUID returned by `tunnel create` and start the tunnel with the helper script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .tools\start-olrac-cloudflare.ps1 -TunnelId <YOUR_TUNNEL_UUID>
+```
+
+The helper script writes `.tools/olrac-tunnel-config.local.yml` and runs a tunnel with this ingress:
+
+- `olrac.com` -> `127.0.0.1:5173`
+- `admin.olrac.com` -> `127.0.0.1:5174`
+
+If your credentials file is not in the default Cloudflare location, pass it explicitly:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .tools\start-olrac-cloudflare.ps1 -TunnelId <YOUR_TUNNEL_UUID> -CredentialsFile C:\Users\YOUR_USER\.cloudflared\<YOUR_TUNNEL_UUID>.json
+```
+
 ## Core User Flows (Easy Overview)
 
 **Client flow**

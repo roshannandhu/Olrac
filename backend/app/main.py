@@ -8,9 +8,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.auth import hash_password
 from app.config import settings
 from app.database import Base, SessionLocal, engine
+from app.default_admin import ensure_default_admin
 from app.models import Booking, Screen, User  # noqa: F401
 from app.routers.admin_router import router as admin_router
 from app.routers.ai_router import router as ai_router
@@ -32,20 +32,9 @@ async def lifespan(app: FastAPI):
 
     db = SessionLocal()
     try:
-        admin = db.query(User).filter(User.email == "admin@olrac.com").first()
-        if not admin:
-            from app.models import UserRole
-
-            admin = User(
-                name="Admin",
-                email="admin@olrac.com",
-                password_hash=hash_password("admin123"),
-                role=UserRole.admin,
-                company="Olrac Adverse",
-            )
-            db.add(admin)
-            db.commit()
-            logger.info("Default admin created: admin@olrac.com / admin123")
+        admin = ensure_default_admin(db, sync_password=settings.DEFAULT_ADMIN_SYNC_PASSWORD)
+        if admin:
+            logger.info("Default admin ready: %s", admin.email)
     finally:
         db.close()
 

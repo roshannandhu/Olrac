@@ -6,9 +6,7 @@ import { SCREEN_PRICING_TIERS } from '../utils/screenPricing'
 export default function ScreenCard({ screen, index = 0 }) {
   const navigate = useNavigate()
 
-  const available = screen.available_slots ?? (screen.total_slots - screen.booked_slots)
-  const usagePercent = screen.total_slots > 0 ? Math.round((screen.booked_slots / screen.total_slots) * 100) : 0
-  const isTrending = usagePercent >= 45 || available <= 5
+  const isTrending = screen.footfall > 10000 || false
 
   const handleBook = () => {
     navigate(`/location/${screen.id}`)
@@ -19,7 +17,7 @@ export default function ScreenCard({ screen, index = 0 }) {
       className="group overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_50px_rgba(15,23,42,0.12)] animate-slide-up"
       style={{ animationDelay: `${index * 0.08}s`, animationFillMode: 'both' }}
     >
-      <div className="relative h-48 overflow-hidden bg-gradient-to-br from-primary-600 via-primary-500 to-purple-500">
+      <div className="relative h-48 overflow-hidden bg-gradient-to-br from-primary-600 via-primary-500 to-primary-400">
         {screen.image_url ? (
           <img
             src={screen.image_url}
@@ -35,11 +33,9 @@ export default function ScreenCard({ screen, index = 0 }) {
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/55 via-slate-950/10 to-transparent" />
 
         <div className="absolute left-4 top-4 flex flex-wrap gap-2">
-          <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm ${
-            available > 0 ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
-          }`}>
+          <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm bg-emerald-500 text-white">
             <Zap className="h-3 w-3" />
-            Live Slots: {available > 0 ? available : 0}
+            Active Display
           </span>
 
           {isTrending ? (
@@ -59,10 +55,6 @@ export default function ScreenCard({ screen, index = 0 }) {
               <MapPin className="h-4 w-4 text-primary-500" />
               {screen.area}
             </div>
-          </div>
-          <div className="rounded-2xl bg-slate-100 px-3 py-2 text-right">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Occupancy</p>
-            <p className="mt-1 text-sm font-bold text-slate-800">{usagePercent}%</p>
           </div>
         </div>
 
@@ -94,32 +86,13 @@ export default function ScreenCard({ screen, index = 0 }) {
           ))}
         </div>
 
-        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
-            <span className="inline-flex items-center gap-1">
-              <TrendingUp className="h-3.5 w-3.5" />
-              Occupancy bar
-            </span>
-            <span>{screen.booked_slots}/{screen.total_slots} used</span>
-          </div>
-          <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-primary-500 via-fuchsia-500 to-violet-600 transition-all duration-700"
-              style={{ width: `${usagePercent}%` }}
-            />
-          </div>
-        </div>
+
 
         <button
           onClick={handleBook}
-          disabled={available <= 0}
-          className={`mt-5 inline-flex w-full items-center justify-center rounded-2xl px-5 py-3 text-sm font-bold transition-all ${
-            available > 0
-              ? 'bg-slate-900 text-white shadow-md hover:bg-black'
-              : 'cursor-not-allowed bg-slate-100 text-slate-400'
-          }`}
+          className="mt-5 inline-flex w-full items-center justify-center rounded-2xl px-5 py-3 text-sm font-bold transition-all bg-slate-900 text-white shadow-md hover:bg-black"
         >
-          {available > 0 ? 'Book Now' : 'Fully Booked'}
+          View Details
         </button>
       </div>
     </div>

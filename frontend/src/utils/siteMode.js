@@ -9,8 +9,9 @@ const host = typeof window !== 'undefined' ? window.location.hostname : ''
 export const siteMode = envSiteMode || (host.startsWith('admin.') ? SITE_MODES.admin : SITE_MODES.client)
 export const isAdminSite = siteMode === SITE_MODES.admin
 
-export const clientSiteUrl = import.meta.env.VITE_CLIENT_SITE_URL || 'https://www.olrac.com'
+export const clientSiteUrl = import.meta.env.VITE_CLIENT_SITE_URL || 'https://olrac.com'
 export const adminSiteUrl = import.meta.env.VITE_ADMIN_SITE_URL || 'https://admin.olrac.com'
+export const adminLoginUrl = `${adminSiteUrl.replace(/\/$/, '')}/login`
 
 export const adminPath = (path = '') => {
   const cleanPath = path.startsWith('/') ? path : `/${path}`

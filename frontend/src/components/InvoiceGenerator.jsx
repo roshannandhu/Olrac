@@ -18,7 +18,6 @@ import {
 import { saveAs } from 'file-saver'
 
 import { formatInr, getBookingStatusMeta } from '../utils/adminUi'
-import { getBillingLabel } from '../utils/screenPricing'
 
 const FALLBACK_SETTINGS = {
   whatsapp_number: '919876543210',
@@ -83,7 +82,7 @@ function buildInvoiceSummary(booking, billingLabel) {
 function buildInvoiceData(booking) {
   const settings = readPublicSettings()
   const config = settings.config || {}
-  const billingLabel = getBillingLabel(booking.billing_cycle || 'monthly')
+  const billingLabel = booking.duration_label || 'Custom Package'
   const status = getBookingStatusMeta(booking.status)
 
   return {

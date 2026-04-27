@@ -28,7 +28,7 @@ async def _call_groq(system_prompt: str, user_prompt: str) -> str:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=8) as client:
             resp = await client.post(GROQ_URL, json=payload, headers=headers)
             resp.raise_for_status()
             data = resp.json()
@@ -61,7 +61,7 @@ async def summarize_booking(booking_data: dict) -> str:
         f"Company: {booking_data.get('company', 'N/A')}\n"
         f"Screen: {booking_data.get('screen_name', 'N/A')}\n"
         f"Area: {booking_data.get('screen_area', 'N/A')}\n"
-        f"Billing Cycle: {booking_data.get('billing_cycle', 'N/A')}\n"
+        f"Duration: {booking_data.get('duration', 'N/A')}\n"
         f"Slots: {booking_data.get('slot_quantity', 1)}\n"
         f"Total Price: ${booking_data.get('total_price', 0)}\n"
         f"Ad Description: {booking_data.get('ad_description', 'N/A')}"

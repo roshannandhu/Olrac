@@ -10,8 +10,11 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Mm, Pt, RGBColor
+import subprocess
+import tempfile
+import sys
+from fastapi.concurrency import run_in_threadpool
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from playwright.sync_api import sync_playwright
 
 from app.models import Booking
 from app.settings_service import get_merged_settings
@@ -57,12 +60,7 @@ def _status_meta(status: str | None) -> dict[str, str]:
 
 
 def _billing_label(value: str | None) -> str:
-    return {
-        "daily": "Monthly Slot",
-        "weekly": "3 Months Slot",
-        "monthly": "6 Months Slot",
-        "yearly": "1 Year Slot",
-    }.get(value or "monthly", value or "monthly")
+    return value or "Custom Package"
 
 
 def _image_to_data_uri(url: str | None) -> str:
@@ -148,7 +146,7 @@ def build_invoice_context(booking: Booking) -> dict:
         "client_phone": booking.phone or "Not provided",
         "location": _selected_location_label(booking),
         "booking_date": booking.created_at.strftime("%d %B %Y") if booking.created_at else "",
-        "time_slot": _billing_label(booking.billing_cycle.value if booking.billing_cycle else "monthly"),
+        "time_slot": _billing_label(booking.duration_label),
         "status_label": status["label"],
         "status_class": status["class_name"],
         "quantity": booking.slot_quantity or 1,
@@ -173,24 +171,99 @@ def build_invoice_context(booking: Booking) -> dict:
     }
 
 
+def build_quotation_context(booking: Booking) -> dict:
+    merged = get_merged_settings()
+    config = merged.get("config", {})
+    prefix = (config.get("quotation_prefix") or "QTN").strip() or "QTN"
+    safe_prefix = "".join(ch for ch in prefix if ch.isalnum() or ch in {"-", "_"})
+    company_name = config.get("quotation_company_name") or config.get("general_app_name") or "OLRAC Advertising"
+    contact_phone = config.get("general_contact_phone") or merged.get("whatsapp_number") or ""
+
+    return {
+        "company_name": company_name,
+        "logo_url": _image_to_data_uri(config.get("quotation_logo_url") or config.get("general_logo_url")),
+        "seal_url": _image_to_data_uri(config.get("quotation_seal_url") or config.get("invoice_seal_url")),
+        "contact_email": merged.get("contact_email") or "",
+        "contact_phone": contact_phone,
+        "address": config.get("quotation_address") or "",
+        "gst_number": config.get("quotation_gst") or "",
+        "quotation_id": f"{safe_prefix}-{str(booking.id).zfill(5)}",
+        "location": _selected_location_label(booking),
+        "primary_color": config.get("quotation_primary_color") or "#334155",
+        "bank_name": config.get("quotation_bank_name") or "",
+        "account_name": config.get("quotation_account_name") or "",
+        "account_number": config.get("quotation_account_number") or "",
+        "ifsc": config.get("quotation_ifsc") or "",
+        "upi": config.get("quotation_upi") or "",
+        "tax_rate": config.get("quotation_tax_rate") or "18",
+    }
+
+
 def render_invoice_html(context: dict) -> str:
     template = jinja_env.get_template("invoice.html")
     return template.render(**context)
 
 
-def generate_invoice_pdf_bytes(context: dict) -> bytes:
-    html_content = render_invoice_html(context)
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
-        page = browser.new_page()
-        page.set_content(html_content, wait_until="networkidle")
-        pdf_bytes = page.pdf(
-            format="A4",
-            print_background=True,
-            margin={"top": "14mm", "right": "14mm", "bottom": "14mm", "left": "14mm"},
-        )
+def _run_subprocess_sync(script: str, html: bytes) -> tuple[bytes, bytes, int]:
+    proc = subprocess.run(
+        [sys.executable, "-c", script],
+        input=html,
+        capture_output=True
+    )
+    return proc.stdout, proc.stderr, proc.returncode
+
+async def _playwright_pdf(html_content: str, *, margin: str = "14mm", viewport_width: int = 1280) -> bytes:
+    with tempfile.NamedTemporaryFile("wb", suffix=".pdf", delete=False) as f:
+        pdf_path = f.name
+
+    pdf_out = pdf_path.replace("\\", "/")
+
+    script = f"""
+from playwright.sync_api import sync_playwright
+import sys
+
+html_content = sys.stdin.buffer.read().decode('utf-8')
+
+try:
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={{"width": {viewport_width}, "height": 1123}})
+        page.set_content(html_content, wait_until="domcontentloaded")
+        page.pdf(path='{pdf_out}', format="A4", print_background=True, margin={{"top": "{margin}", "right": "{margin}", "bottom": "{margin}", "left": "{margin}"}})
         browser.close()
+except Exception as e:
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+"""
+
+    import os
+    stdout, stderr, returncode = await run_in_threadpool(_run_subprocess_sync, script, html_content.encode('utf-8'))
+
+    if returncode != 0:
+        error_msg = stderr.decode('utf-8', errors='replace') if stderr else stdout.decode('utf-8', errors='replace')
+        if os.path.exists(pdf_path):
+            try: os.remove(pdf_path)
+            except: pass
+        raise Exception(f"Playwright Subprocess Failed:\\n{error_msg}")
+
+    with open(pdf_path, "rb") as f:
+        pdf_bytes = f.read()
+
+    if os.path.exists(pdf_path):
+        try: os.remove(pdf_path)
+        except: pass
+
     return pdf_bytes
+
+
+async def generate_invoice_pdf_bytes(context: dict) -> bytes:
+    return await _playwright_pdf(render_invoice_html(context))
+
+
+async def generate_pdf_from_html(html_content: str) -> bytes:
+    """Render an A4 document HTML (794px body) to PDF via Playwright."""
+    return await _playwright_pdf(html_content, margin="0mm", viewport_width=794)
 
 
 def _set_run_style(run, *, size=10.5, bold=False, color="0F172A"):

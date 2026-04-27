@@ -1,0 +1,225 @@
+================================================================
+OLRAC ADVERSE - DEPLOYMENT GUIDE (FREE HOSTING)
+================================================================
+
+OVERVIEW
+--------
+You have the domain from GoDaddy. You need 3 free services:
+
+  1. Supabase  → Free PostgreSQL database
+  2. Render    → Free Python/FastAPI backend server
+  3. Vercel    → Free frontend hosting (2 sites: client + admin)
+
+Your GoDaddy domain (e.g. olrac.com) will be pointed to Vercel.
+
+
+================================================================
+STEP 1 — SET UP DATABASE (Supabase)
+================================================================
+
+1. Go to https://supabase.com
+2. Create a free account
+3. Click "New Project" → give it a name, set a password (SAVE IT)
+4. Wait for the project to be ready (~2 min)
+5. Go to: Settings → Database → Connection string → URI
+6. Copy the full URI, it looks like:
+   postgresql://postgres:[YOUR-PASSWORD]@db.xxxx.supabase.co:5432/postgres
+7. SAVE THIS — you will need it later as DATABASE_URL
+
+
+================================================================
+STEP 2 — PUSH CODE TO GITHUB
+================================================================
+
+You need to push the project to GitHub first (Render and Vercel
+pull code from GitHub automatically).
+
+1. Go to https://github.com → Create account if you don't have one
+2. Create a new repository called "olrac" (set to Private)
+3. Open terminal in the project folder and run:
+
+   git remote add origin https://github.com/YOUR_USERNAME/olrac.git
+   git add .
+   git commit -m "prepare for deployment"
+   git push -u origin main
+
+NOTE: Before pushing, make sure backend/.env is in .gitignore
+so your API keys are not public!
+
+
+================================================================
+STEP 3 — DEPLOY BACKEND (Render)
+================================================================
+
+1. Go to https://render.com → Create free account
+2. Click "New" → "Web Service"
+3. Connect your GitHub account and select the olrac repo
+4. Fill in these settings:
+   - Root Directory:   backend
+   - Build Command:    pip install -r requirements.txt
+   - Start Command:    gunicorn -w 2 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT
+
+5. Scroll down to "Environment Variables" and add:
+
+   DATABASE_URL         = (paste your Supabase URI from Step 1)
+   JWT_SECRET_KEY       = (any random text, e.g. "MySecretKey2026XYZ")
+   GROQ_API_KEY         = (your Groq API key)
+   SMTP_HOST            = smtp.gmail.com
+   SMTP_PORT            = 587
+   SMTP_USER            = (your Gmail address)
+   SMTP_PASSWORD        = (your Gmail app password)
+   CORS_ORIGINS         = https://olrac.com,https://www.olrac.com,https://admin.olrac.com
+   CORS_ORIGIN_REGEX    = (leave blank)
+   DEFAULT_ADMIN_EMAIL  = (your email)
+   DEFAULT_ADMIN_PASSWORD = (a strong password — NOT admin123)
+
+6. Click "Create Web Service" → wait for it to deploy (~3 min)
+7. You will get a URL like: https://olrac-backend.onrender.com
+   SAVE THIS URL — you need it for the frontend steps.
+
+TEST IT: Open https://olrac-backend.onrender.com/health
+         You should see: {"status":"healthy"}
+
+
+================================================================
+STEP 4 — DEPLOY CLIENT FRONTEND (Vercel)
+================================================================
+
+1. Go to https://vercel.com → Create free account
+2. Click "Add New" → "Project"
+3. Import your GitHub repo (olrac)
+4. Fill in these settings:
+   - Root Directory:   frontend
+   - Build Command:    npm run build:client
+   - Output Directory: dist/client
+
+5. Add Environment Variables:
+   VITE_SITE_MODE      = client
+   VITE_API_BASE_URL   = https://olrac-backend.onrender.com/api
+   VITE_ADMIN_SITE_URL = https://admin.olrac.com
+   VITE_CLIENT_SITE_URL = https://olrac.com
+
+6. Click "Deploy" → wait for build (~2 min)
+7. Go to project Settings → Domains → Add "olrac.com"
+
+
+================================================================
+STEP 5 — DEPLOY ADMIN FRONTEND (Vercel - Second Project)
+================================================================
+
+1. In Vercel, click "Add New" → "Project" AGAIN (same repo)
+2. Import the same olrac GitHub repo
+3. Fill in DIFFERENT settings this time:
+   - Root Directory:   frontend
+   - Build Command:    npm run build:admin
+   - Output Directory: dist/admin
+
+4. Add Environment Variables:
+   VITE_SITE_MODE       = admin
+   VITE_API_BASE_URL    = https://olrac-backend.onrender.com/api
+   VITE_ADMIN_SITE_URL  = https://admin.olrac.com
+   VITE_CLIENT_SITE_URL = https://olrac.com
+
+5. Click "Deploy"
+6. Go to project Settings → Domains → Add "admin.olrac.com"
+
+
+================================================================
+STEP 6 — POINT GODADDY DOMAIN TO VERCEL
+================================================================
+
+1. Log in to GoDaddy → My Products → Domains → click "DNS"
+   next to your domain
+
+2. For the MAIN SITE (olrac.com):
+   - Find the existing "A" record for "@" → DELETE it
+   - Add new A record:
+     Type:  A
+     Name:  @
+     Value: 76.76.21.21
+   - Add CNAME record:
+     Type:  CNAME
+     Name:  www
+     Value: cname.vercel-dns.com
+
+3. For the ADMIN SITE (admin.olrac.com):
+   - Add CNAME record:
+     Type:  CNAME
+     Name:  admin
+     Value: cname.vercel-dns.com
+
+4. Save changes.
+   Wait 10 minutes to 24 hours for DNS to propagate worldwide.
+
+
+================================================================
+STEP 7 — CODE CHANGES NEEDED BEFORE ALL THIS
+================================================================
+
+Before deploying, make these small fixes in the code:
+
+FIX 1 — backend/app/main.py
+Replace these 2 lines:
+   os.makedirs("uploads", exist_ok=True)
+   app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+With:
+   from pathlib import Path
+   UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
+   UPLOAD_DIR.mkdir(exist_ok=True)
+   app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+
+FIX 2 — backend/requirements.txt
+Add this line:
+   gunicorn==22.0.0
+
+FIX 3 — .gitignore
+Add these lines so uploaded files are not pushed to GitHub:
+   backend/uploads/*
+   !backend/uploads/.gitkeep
+
+Then create an empty file at: backend/uploads/.gitkeep
+
+
+================================================================
+VERIFICATION CHECKLIST
+================================================================
+
+After everything is set up, test these:
+
+[ ] https://olrac-backend.onrender.com/health → {"status":"healthy"}
+[ ] https://olrac-backend.onrender.com/docs   → API documentation page
+[ ] https://olrac.com                          → Client site loads
+[ ] https://admin.olrac.com/login             → Admin login page loads
+[ ] Log in with your admin email + password   → Dashboard opens
+[ ] Add a screen in admin                     → Appears on client map
+
+
+================================================================
+KNOWN LIMITATIONS (Free Tier)
+================================================================
+
+1. BACKEND SLEEPS: Render free tier shuts down after 15 minutes
+   of no traffic. The next visitor will wait ~30 seconds for it
+   to wake up. (Upgrade to $7/month Render plan to fix this)
+
+2. UPLOADED IMAGES RESET: When Render restarts, uploaded screen
+   images/videos are deleted. Solution later: use Cloudinary
+   (also free) for permanent file storage.
+
+3. PDF INVOICES: May not work on Render free tier. DOCX invoices
+   will still work fine.
+
+
+================================================================
+SERVICES SUMMARY
+================================================================
+
+Service    | URL                                | Cost
+-----------|------------------------------------|---------
+Supabase   | https://supabase.com               | Free
+Render     | https://render.com                 | Free
+Vercel     | https://vercel.com                 | Free
+GoDaddy    | https://godaddy.com (you have this)| Already paid
+
+================================================================

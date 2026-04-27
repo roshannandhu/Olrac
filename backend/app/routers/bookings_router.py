@@ -1,16 +1,23 @@
 """Booking routes for public clients and authenticated client history."""
 
+import logging
 import threading
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.ai_service import classify_intent, summarize_booking
 from app.database import get_db
+import hashlib
+from app.config import settings
 from app.deps import get_current_user
-from app.email_service import send_booking_confirmation, send_booking_verification_otp
-from app.models import BillingCycle, Booking, BookingStatus, Screen, User
+from datetime import datetime, timezone, timedelta
+from app.email_service import send_booking_confirmation, send_booking_verification_otp, _send_html_email, build_quotation_html
+from app.invoice_service import generate_pdf_from_html, build_quotation_context
+from app.models import Booking, BookingStatus, Screen, User
 from app.otp_service import (
     OtpExpiredError,
     OtpInvalidError,
@@ -20,6 +27,12 @@ from app.otp_service import (
     discard_booking_otp,
     validate_booking_verification,
     verify_booking_otp,
+)
+from app.quotation_service import (
+    build_quotation_items,
+    calculate_quotation_totals,
+    is_truthy,
+    synchronize_booking_pricing,
 )
 from app.schemas import (
     BookingCreate,
@@ -31,6 +44,7 @@ from app.schemas import (
     SelectedScreenOut,
 )
 from app.settings_service import get_merged_settings
+from app.slot_sync_service import get_booking_screen_ids, get_booking_slots_map, sync_booked_slots_for_screens
 
 router = APIRouter(prefix="/api/bookings", tags=["Bookings"])
 
@@ -56,6 +70,8 @@ def _build_selected_screens_snapshot(screens: List[Screen], screen_slots: dict) 
             "name": screen.name,
             "area": screen.area,
             "slots": screen_slots.get(screen.id, 1),
+            "base_price": float(screen.base_price or 0),
+            "price_unit": screen.price_unit or "day",
         }
         for screen in screens
     ]
@@ -77,12 +93,7 @@ def _get_selected_screens_snapshot(booking: Booking) -> List[dict]:
 
 
 def _get_selected_screen_ids(booking: Booking) -> List[int]:
-    selected_ids = booking.selected_screen_ids or []
-    if selected_ids:
-        return [int(screen_id) for screen_id in selected_ids]
-    if booking.screen_id is not None:
-        return [int(booking.screen_id)]
-    return []
+    return get_booking_screen_ids(booking)
 
 
 def _selected_location_label(snapshots: List[dict]) -> str | None:
@@ -125,6 +136,19 @@ def _resolve_selected_screens(db: Session, screen_ids: List[int]) -> List[Screen
     return selected_screens
 
 
+def _get_screen_unit_price(screen: Screen, duration_days: int, duration_hours: int) -> float:
+    rate = float(screen.base_price or 0)
+
+    if screen.price_unit == "hour":
+        return rate * max(1, int(duration_hours or 0))
+
+    if screen.price_unit == "month":
+        months = max(1, round((int(duration_days or 0)) / 30))
+        return rate * months
+
+    return rate * max(1, int(duration_days or 0))
+
+
 def _get_booking_screens(db: Session, booking: Booking) -> List[Screen]:
     selected_ids = _get_selected_screen_ids(booking)
     if not selected_ids:
@@ -136,29 +160,25 @@ def _get_booking_screens(db: Session, booking: Booking) -> List[Screen]:
 
 
 def _reserve_booking_screens(db: Session, booking: Booking):
+    """
+    Validate that requested slots do not exceed total_slots.
+    (We no longer block/increment booked_slots for enquiries).
+    """
     screens = _get_booking_screens(db, booking)
-    snapshots = booking.selected_screens or []
-    slots_map = {s["id"]: s.get("slots", booking.slot_quantity) for s in snapshots}
+    slots_map = get_booking_slots_map(booking)
 
     for screen in screens:
         slots = slots_map.get(screen.id, booking.slot_quantity)
-        if screen.available_slots < slots:
+        if screen.total_slots < slots:
             raise HTTPException(
                 status_code=400,
-                detail=f"Only {screen.available_slots} slots available for {screen.name}",
+                detail=f"Only {screen.total_slots} max slots allowed for {screen.name}",
             )
-
-    for screen in screens:
-        slots = slots_map.get(screen.id, booking.slot_quantity)
-        screen.booked_slots += slots
 
 
 def _release_booking_screens(db: Session, booking: Booking):
-    snapshots = booking.selected_screens or []
-    slots_map = {s["id"]: s.get("slots", booking.slot_quantity) for s in snapshots}
-    for screen in _get_booking_screens(db, booking):
-        slots = slots_map.get(screen.id, booking.slot_quantity)
-        screen.booked_slots = max(0, screen.booked_slots - slots)
+    """No longer decrement booked_slots as slots are no longer saturated."""
+    pass
 
 
 def _booking_to_out(booking: Booking) -> BookingOut:
@@ -179,7 +199,10 @@ def _booking_to_out(booking: Booking) -> BookingOut:
         budget=float(booking.budget) if booking.budget else None,
         ad_description=booking.ad_description,
         polished_description=booking.polished_description,
-        billing_cycle=booking.billing_cycle.value if booking.billing_cycle else "monthly",
+        duration_label=booking.duration_label or "Custom",
+        duration_days=booking.duration_days or 0,
+        duration_hours=booking.duration_hours or 0,
+        billing_cycle=None,
         slot_quantity=booking.slot_quantity,
         total_price=float(booking.total_price or 0),
         status=booking.status.value if booking.status else "pending",
@@ -189,6 +212,7 @@ def _booking_to_out(booking: Booking) -> BookingOut:
         screen_name=_selected_location_label(selected_screens),
         screen_area=_selected_area_label(selected_screens),
         user_name=booking.user.name if booking.user else None,
+        quotation_token=hashlib.sha256(f"{booking.id}-{booking.email}-{settings.JWT_SECRET_KEY}".encode()).hexdigest(),
     )
 
 
@@ -198,7 +222,19 @@ def send_booking_otp(req: BookingOtpSendRequest, background_tasks: BackgroundTas
     try:
         otp_payload = create_booking_otp(str(req.email))
     except OtpRateLimitError as exc:
-        raise HTTPException(status_code=429, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=429,
+            detail={"message": str(exc), "retry_after_seconds": exc.retry_after_seconds}
+        ) from exc
+
+    logger.warning(
+        "\n========== OTP CODE (DEV) ==========\n"
+        "  Email : %s\n"
+        "  Code  : %s\n"
+        "  TTL   : %s seconds\n"
+        "=====================================",
+        otp_payload["email"], otp_payload["code"], otp_payload["expires_in_seconds"],
+    )
 
     def _send_otp_bg():
         sent = send_booking_verification_otp(
@@ -207,7 +243,7 @@ def send_booking_otp(req: BookingOtpSendRequest, background_tasks: BackgroundTas
             max(1, (otp_payload["expires_in_seconds"] + 59) // 60),
         )
         if not sent:
-            discard_booking_otp(otp_payload["email"])
+            logger.warning("SMTP failed — use the OTP printed above in the terminal.")
 
     background_tasks.add_task(_send_otp_bg)
 
@@ -238,6 +274,7 @@ def verify_booking_email_otp(req: BookingOtpVerifyRequest):
 @router.post("", response_model=BookingOut, status_code=status.HTTP_201_CREATED)
 async def create_booking(
     req: BookingCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     """Create a new public quotation request from the client website."""
@@ -264,39 +301,29 @@ async def create_booking(
             status_code=400,
             detail="Email verification is required before requesting a quote.",
         )
-    if not req.email_verification_token:
-        raise HTTPException(
-            status_code=400,
-            detail="Verify your email before requesting a quote.",
-        )
-    if not validate_booking_verification(email, req.email_verification_token):
-        raise HTTPException(
-            status_code=400,
-            detail="Your email verification expired. Please verify again to continue.",
-        )
+    otp_required = config.get("security_otp_booking_enable", True)
+    if otp_required:
+        if not req.email_verification_token:
+            raise HTTPException(
+                status_code=400,
+                detail="Verify your email before requesting a quote.",
+            )
+        if not validate_booking_verification(email, req.email_verification_token):
+            raise HTTPException(
+                status_code=400,
+                detail="Your email verification expired. Please verify again to continue.",
+            )
 
-    try:
-        billing_cycle = BillingCycle(req.billing_cycle)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid billing cycle") from exc
-
-    total = 0.0
-    total_slots_booked = 0
     screen_slots_dict = req.screen_slots or {}
-
-    for screen in selected_screens:
-        if billing_cycle == BillingCycle.daily:
-            unit_price = float(screen.price_daily or 0)
-        elif billing_cycle == BillingCycle.weekly:
-            unit_price = float(screen.price_weekly or 0)
-        elif billing_cycle == BillingCycle.yearly:
-            unit_price = float(screen.price_yearly or 0)
-        else:
-            unit_price = float(screen.price_monthly or 0)
-
-        slots = screen_slots_dict.get(screen.id) or req.slot_quantity
-        total += unit_price * slots
-        total_slots_booked += slots
+    selected_screens_snapshot = _build_selected_screens_snapshot(selected_screens, screen_slots_dict)
+    base_seconds = int(config.get("booking_base_slot_duration_seconds", 20))
+    quotation_items = build_quotation_items(
+        selected_screens_snapshot,
+        duration_days=req.duration_days,
+        duration_hours=req.duration_hours,
+        base_slot_duration=base_seconds,
+        default_slot_quantity=req.slot_quantity,
+    )
 
     default_status = config.get("booking_default_status", "pending")
     if default_status == "approved":
@@ -305,8 +332,44 @@ async def create_booking(
         default_status = "pending"
 
     primary_screen = selected_screens[0]
-    selected_screens_snapshot = _build_selected_screens_snapshot(selected_screens, screen_slots_dict)
-    
+    affected_screen_ids = [screen.id for screen in selected_screens]
+
+    tax_enabled = is_truthy(config.get("quotation_tax_enabled", True), True)
+    tax_rate = float(config.get("quotation_tax_rate", 18)) if tax_enabled else 0.0
+    quotation_totals = calculate_quotation_totals(
+        quotation_items,
+        discount=0,
+        tax_rate=tax_rate,
+        tax_enabled=tax_enabled,
+    )
+    total = quotation_totals["grand_total"]
+
+    now = datetime.now(timezone.utc)
+    delta_days = req.duration_days or 30
+    duration_start_str = now.strftime("%d %b %Y")
+    duration_end_str = (now + timedelta(days=delta_days)).strftime("%d %b %Y")
+    total_days_text = req.duration_label or f"{delta_days} Days"
+
+    location_names = ", ".join(screen.name for screen in selected_screens)
+    area_names = ", ".join(dict.fromkeys(screen.area for screen in selected_screens if screen.area))
+
+    ai_category = None
+    ai_summary = None
+    try:
+        ai_category = await classify_intent(req.ad_description or "General advertisement")
+        ai_summary = await summarize_booking({
+            "client_name": req.client_name,
+            "company": req.company,
+            "screen_name": location_names,
+            "screen_area": area_names,
+            "duration": req.duration_label,
+            "slot_quantity": req.slot_quantity,
+            "total_price": total,
+            "ad_description": req.ad_description,
+        })
+    except Exception:
+        logger.warning("AI enrichment unavailable; proceeding without AI fields", exc_info=True)
+
     booking = Booking(
         user_id=None,
         screen_id=primary_screen.id,
@@ -319,39 +382,38 @@ async def create_booking(
         budget=req.budget,
         ad_description=req.ad_description,
         polished_description=req.polished_description,
-        billing_cycle=billing_cycle,
-        slot_quantity=req.slot_quantity, # Retain as root default/fallback indicator
-        total_price=total,
+        duration_label=req.duration_label,
+        duration_days=req.duration_days,
+        duration_hours=req.duration_hours,
+        billing_cycle=None,
+        slot_quantity=req.slot_quantity,
+        total_price=quotation_totals["grand_total"],
         status=BookingStatus(default_status),
+        ai_category=ai_category,
+        ai_summary=ai_summary,
+        quotation_data={
+            "pricing_mode": "booking",
+            "items": quotation_items,
+            "subtotal": quotation_totals["subtotal"],
+            "discount": quotation_totals["discount"],
+            "tax_enabled": tax_enabled,
+            "tax_rate": tax_rate,
+            "grand_total": quotation_totals["grand_total"],
+            "duration_start": duration_start_str,
+            "duration_end": duration_end_str,
+            "total_days_text": total_days_text,
+        }
     )
 
     if booking.status == BookingStatus.confirmed:
         _reserve_booking_screens(db, booking)
 
     db.add(booking)
+    sync_booked_slots_for_screens(db, affected_screen_ids)
     db.commit()
     db.refresh(booking)
-    consume_booking_verification(email, req.email_verification_token)
-
-    location_names = ", ".join(screen.name for screen in selected_screens)
-    area_names = ", ".join(dict.fromkeys(screen.area for screen in selected_screens if screen.area))
-
-    try:
-        booking.ai_category = await classify_intent(req.ad_description or "General advertisement")
-        booking.ai_summary = await summarize_booking({
-            "client_name": req.client_name,
-            "company": req.company,
-            "screen_name": location_names,
-            "screen_area": area_names,
-            "billing_cycle": billing_cycle.value,
-            "slot_quantity": req.slot_quantity,
-            "total_price": total,
-            "ad_description": req.ad_description,
-        })
-        db.commit()
-        db.refresh(booking)
-    except Exception:
-        pass
+    if otp_required and req.email_verification_token:
+        consume_booking_verification(email, req.email_verification_token)
 
     email_data = {
         "booking_id": booking.id,
@@ -359,16 +421,58 @@ async def create_booking(
         "company": req.company,
         "screen_name": _selected_location_label(selected_screens_snapshot) or location_names,
         "screen_area": _selected_area_label(selected_screens_snapshot) or area_names,
-        "billing_cycle": billing_cycle.value,
+        "duration": req.duration_label,
         "slot_quantity": req.slot_quantity,
         "total_price": total,
     }
     if email:
-        threading.Thread(
-            target=send_booking_confirmation,
-            args=(email, email_data),
-            daemon=True,
-        ).start()
+        async def _auto_email_quotation(booking_id: int):
+            from app.database import SessionLocal
+            with SessionLocal() as session:
+                b = session.query(Booking).filter(Booking.id == booking_id).first()
+                if not b: return
+                context = build_quotation_context(b)
+                b_snapshots = list(b.selected_screens or [])
+                if not b_snapshots and b.screen:
+                    b_snapshots = [{"id": b.screen.id, "name": b.screen.name, "area": b.screen.area}]
+                company = {
+                    "name": context.get("company_name") or "",
+                    "phone": context.get("contact_phone") or "",
+                    "email": context.get("contact_email") or "",
+                    "address": context.get("address") or "",
+                    "logo_url": context.get("logo_url") or "",
+                    "seal_url": context.get("seal_url") or "",
+                    "location_label": _selected_area_label(b_snapshots) or _selected_location_label(b_snapshots) or "",
+                    "bank_name": context.get("bank_name") or "",
+                    "account_name": context.get("account_name") or "",
+                    "account_number": context.get("account_number") or "",
+                    "ifsc": context.get("ifsc") or "",
+                    "upi": context.get("upi") or "",
+                    "tax_rate": context.get("tax_rate") or "18",
+                    "tax_enabled": config.get("quotation_tax_enabled", True),
+                    "booking_base_slot_duration_seconds": config.get("booking_base_slot_duration_seconds", 20),
+                }
+                html = build_quotation_html(b, b.quotation_data or {}, company)
+                pdf = await generate_pdf_from_html(html)
+                
+                subject = f"Your Quotation from {company['name'] or 'Us'} (Quote #{b.id})"
+                body = f"<p>Hello {b.client_name},</p><p>Please find attached your requested quotation for the {location_names} screens.</p>"
+                
+                emails_to_send = [b.email]
+                admin_email = config.get("admin_email")
+                if admin_email:
+                    emails_to_send.append(admin_email)
+                    
+                for to_email in emails_to_send:
+                    _send_html_email(
+                        to_email,
+                        subject=subject,
+                        html_body=body,
+                        pdf_bytes=pdf,
+                        pdf_filename=f"Quotation_OLRAC{b.id}.pdf"
+                    )
+
+        background_tasks.add_task(_auto_email_quotation, booking.id)
 
     return _booking_to_out(booking)
 
@@ -379,13 +483,78 @@ def get_my_bookings(
     current_user: User = Depends(get_current_user),
 ):
     """Get all bookings for the current authenticated client."""
+    merged_config = get_merged_settings()["config"]
     bookings = (
         db.query(Booking)
         .filter(Booking.user_id == current_user.id)
         .order_by(Booking.created_at.desc())
         .all()
     )
+    pricing_changed = False
+    for booking in bookings:
+        pricing_changed = synchronize_booking_pricing(booking, merged_config) or pricing_changed
+    if pricing_changed:
+        db.commit()
     return [_booking_to_out(booking) for booking in bookings]
+
+
+from fastapi.responses import StreamingResponse
+from io import BytesIO
+
+@router.get("/{booking_id}/quotation/pdf")
+async def get_public_quotation_pdf(
+    booking_id: int,
+    token: str,
+    db: Session = Depends(get_db),
+):
+    """Download the generated Quotation PDF via a secure token."""
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    expected_token = hashlib.sha256(f"{booking.id}-{booking.email}-{settings.JWT_SECRET_KEY}".encode()).hexdigest()
+    if token != expected_token:
+        raise HTTPException(status_code=403, detail="Invalid or expired secure token")
+
+    merged_settings = get_merged_settings()
+    config = merged_settings["config"]
+    if synchronize_booking_pricing(booking, config):
+        db.commit()
+        db.refresh(booking)
+    
+    # We need location names for company context
+    snapshots = list(booking.selected_screens or [])
+    if not snapshots and booking.screen:
+        snapshots = [{"id": booking.screen.id, "name": booking.screen.name, "area": booking.screen.area}]
+
+    context = build_quotation_context(booking)
+    company = {
+        "name": context.get("company_name") or "",
+        "phone": context.get("contact_phone") or "",
+        "email": context.get("contact_email") or "",
+        "address": context.get("address") or "",
+        "logo_url": context.get("logo_url") or "",
+        "seal_url": context.get("seal_url") or "",
+        "location_label": _selected_area_label(snapshots) or _selected_location_label(snapshots) or "",
+        "bank_name": context.get("bank_name") or "",
+        "account_name": context.get("account_name") or "",
+        "account_number": context.get("account_number") or "",
+        "ifsc": context.get("ifsc") or "",
+        "upi": context.get("upi") or "",
+        "tax_rate": context.get("tax_rate") or "18",
+        "tax_enabled": config.get("quotation_tax_enabled", True),
+        "booking_base_slot_duration_seconds": config.get("booking_base_slot_duration_seconds", 20),
+    }
+
+    quotation_data = booking.quotation_data or {}
+    html = build_quotation_html(booking, quotation_data, company)
+    pdf_bytes = await generate_pdf_from_html(html)
+
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="Quotation_OLRAC{booking.id}.pdf"'},
+    )
 
 
 @router.patch("/{booking_id}/cancel", response_model=BookingOut)
@@ -410,6 +579,7 @@ def cancel_my_booking(
         _release_booking_screens(db, booking)
 
     booking.status = BookingStatus.cancelled
+    sync_booked_slots_for_screens(db, _get_selected_screen_ids(booking))
     db.commit()
     db.refresh(booking)
     return _booking_to_out(booking)

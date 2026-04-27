@@ -4,29 +4,37 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
         primary: {
-          50: '#f5f3ff',
-          100: '#ede9fe',
-          200: '#ddd6fe',
-          300: '#c4b5fd',
-          400: '#a78bfa',
-          500: '#8b5cf6',
-          600: '#7c3aed',
-          700: '#6d28d9',
-          800: '#5b21b6',
-          900: '#4c1d95',
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
         },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
+      spacing: {
+        '13': '3.25rem',
+        '18': '4.5rem',
+      },
       boxShadow: {
         'card': '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
         'card-hover': '0 10px 25px rgba(0,0,0,0.08), 0 4px 10px rgba(0,0,0,0.04)',
-        'elevated': '0 20px 40px rgba(124,58,237,0.1)',
+        'elevated': '0 20px 40px rgba(29,78,216,0.1)',
+        'glow': '0 0 40px rgba(29,78,216,0.3), 0 0 80px rgba(29,78,216,0.1)',
+        'glow-sm': '0 0 20px rgba(29,78,216,0.2)',
+        'dark': '0 20px 60px rgba(0,0,0,0.4)',
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-out',

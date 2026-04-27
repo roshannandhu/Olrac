@@ -17,6 +17,19 @@ const defaultSettings = {
     invoice_seal_url: '',
     whatsapp_template: DEFAULT_WHATSAPP_TEMPLATE,
     whatsapp_enable: true,
+    whatsapp_message_format: 'text',
+    booking_base_slot_duration_seconds: 20,
+    booking_default_duration_id: 'd3',
+    booking_method_whatsapp: true,
+    booking_method_email: true,
+    security_otp_booking_enable: true,
+    booking_durations: [
+      { id: 'd1', label: '1 Day', days: 1, hours: 24 },
+      { id: 'd2', label: '1 Week', days: 7, hours: 168 },
+      { id: 'd3', label: '1 Month', days: 30, hours: 720 },
+      { id: 'd4', label: '6 Months', days: 180, hours: 4320 },
+      { id: 'd5', label: '1 Year', days: 365, hours: 8760 },
+    ],
   },
 }
 
@@ -36,11 +49,12 @@ export function PublicSettingsProvider({ children }) {
         contact_email: res.data.contact_email || defaultSettings.contact_email,
         config: { ...defaultSettings.config, ...(res.data.config || {}) },
       }
-      setSettings(nextSettings)
-      localStorage.setItem('olrac_public_settings', JSON.stringify(nextSettings))
+      const next = JSON.stringify(nextSettings)
+      localStorage.setItem('olrac_public_settings', next)
+      setSettings(prev => JSON.stringify(prev) === next ? prev : nextSettings)
     } catch {
-      setSettings(defaultSettings)
       localStorage.setItem('olrac_public_settings', JSON.stringify(defaultSettings))
+      setSettings(prev => JSON.stringify(prev) === JSON.stringify(defaultSettings) ? prev : defaultSettings)
     }
   }
 

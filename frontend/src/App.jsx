@@ -1,8 +1,11 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import React, { useEffect, useRef, useState } from 'react'
+import { Routes, Route, Navigate, useLocation, useNavigationType } from 'react-router-dom'
 import { useAuth } from './context/auth-context'
+import { AnimatePresence } from 'framer-motion'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
+import LoadingScreen from './components/LoadingScreen'
 
 // Pages
 import Landing from './pages/Landing'
@@ -17,6 +20,51 @@ import AdminBookings from './pages/AdminBookings'
 import AdminScreens from './pages/AdminScreens'
 import AdminSettings from './pages/AdminSettings'
 import { adminSiteUrl, isAdminSite } from './utils/siteMode'
+import { hasSeenIntroSplash, LOADER_DELAY_MS, LOADER_MIN_VISIBLE_MS } from './utils/displayExperience'
+
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  const navType = useNavigationType()
+  useEffect(() => {
+    if (navType !== 'POP') window.scrollTo(0, 0)
+  }, [pathname, navType])
+  return null
+}
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error, info) {
+    console.error('App crashed:', error, info?.componentStack)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#050508]">
+          <div className="text-center px-6">
+            <h1 className="text-4xl font-bold text-white mb-4">Something went wrong</h1>
+            <p className="text-gray-400 mb-8">An unexpected error occurred. Please refresh the page.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 function NotFound() {
   return (
@@ -73,8 +121,11 @@ function AdminRoutes() {
 }
 
 function ClientRoutes() {
+  const location = useLocation()
+
   return (
-    <Routes>
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
       {/* Public */}
       <Route path="/" element={<Landing />} />
       <Route path="/about" element={<About />} />
@@ -99,31 +150,53 @@ function ClientRoutes() {
 
       {/* Fallback */}
       <Route path="*" element={<NotFound />} />
-    </Routes>
+      </Routes>
+    </AnimatePresence>
   )
 }
 
 export default function App() {
   const { loading } = useAuth()
+  const location = useLocation()
+  const [showLoadingScreen, setShowLoadingScreen] = useState(false)
+  const visibleSinceRef = useRef(0)
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-3 border-primary-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-500 font-medium">Loading Olrac Adverse...</p>
-        </div>
-      </div>
-    )
-  }
+  useEffect(() => {
+    let timer
+
+    if (loading) {
+      if (!showLoadingScreen) {
+        timer = window.setTimeout(() => {
+          visibleSinceRef.current = Date.now()
+          setShowLoadingScreen(true)
+        }, LOADER_DELAY_MS)
+      }
+    } else if (showLoadingScreen) {
+      const elapsed = Date.now() - visibleSinceRef.current
+      timer = window.setTimeout(() => {
+        setShowLoadingScreen(false)
+      }, Math.max(0, LOADER_MIN_VISIBLE_MS - elapsed))
+    }
+
+    return () => window.clearTimeout(timer)
+  }, [loading, showLoadingScreen])
+
+  const shouldSuppressLoaderForIntro = !isAdminSite && location.pathname === '/' && !hasSeenIntroSplash()
+  const shouldRenderLoadingScreen = showLoadingScreen && !shouldSuppressLoaderForIntro
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f8f8fa]">
-      <Navbar />
-      <main className="flex-1">
-        {isAdminSite ? <AdminRoutes /> : <ClientRoutes />}
-      </main>
-      {!isAdminSite && <Footer />}
-    </div>
+    <ErrorBoundary>
+      <ScrollToTop />
+      <div className="min-h-screen flex flex-col bg-[#050508]">
+        <AnimatePresence>
+          {shouldRenderLoadingScreen && <LoadingScreen />}
+        </AnimatePresence>
+        <Navbar />
+        <main className="flex-1">
+          {isAdminSite ? <AdminRoutes /> : <ClientRoutes />}
+        </main>
+        {!isAdminSite && <Footer />}
+      </div>
+    </ErrorBoundary>
   )
 }

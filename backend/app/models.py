@@ -17,6 +17,7 @@ class UserRole(str, enum.Enum):
     client = "client"
 
 
+# Note: BillingCycle enum is deprecated but kept for backwards compatibility parsing.
 class BillingCycle(str, enum.Enum):
     daily = "daily"
     weekly = "weekly"
@@ -42,6 +43,7 @@ class User(Base):
     role = Column(SAEnum(UserRole), default=UserRole.client, nullable=False)
     company = Column(String(150), nullable=True)
     phone = Column(String(20), nullable=True)
+    must_change_password = Column(Boolean, default=False, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     bookings = relationship("Booking", back_populates="user", cascade="all, delete-orphan")
@@ -62,12 +64,16 @@ class Screen(Base):
     price_weekly = Column(Numeric(10, 2), nullable=False, default=0)
     price_monthly = Column(Numeric(10, 2), nullable=False, default=0)
     price_yearly = Column(Numeric(10, 2), nullable=False, default=0)
+    base_price = Column(Numeric(10, 2), nullable=False, default=0)
+    price_unit = Column(String(20), nullable=False, default="day")
     total_slots = Column(Integer, nullable=False, default=10)
     booked_slots = Column(Integer, nullable=False, default=0)
     latitude = Column(Numeric(9, 6), nullable=True)
     longitude = Column(Numeric(9, 6), nullable=True)
     image_url = Column(String(500), nullable=True)
+    promo_video_url = Column(String(500), nullable=True)
     additional_images = Column(JSON, nullable=True, default=list)
+    gallery_order = Column(JSON, nullable=True, default=list)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -100,7 +106,10 @@ class Booking(Base):
     polished_description = Column(Text, nullable=True)
 
     # Booking details
-    billing_cycle = Column(SAEnum(BillingCycle), nullable=False, default=BillingCycle.monthly)
+    duration_label = Column(String(100), nullable=False, default="1 Month")
+    duration_days = Column(Integer, nullable=False, default=0)
+    duration_hours = Column(Integer, nullable=False, default=0)
+    billing_cycle = Column(SAEnum(BillingCycle), nullable=True) # Deprecated
     slot_quantity = Column(Integer, nullable=False, default=1)
     total_price = Column(Numeric(10, 2), nullable=False, default=0)
 
@@ -110,6 +119,8 @@ class Booking(Base):
     # AI-generated fields
     ai_category = Column(String(100), nullable=True)
     ai_summary = Column(Text, nullable=True)
+
+    quotation_data = Column(JSON, nullable=True, default=dict)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

@@ -4,14 +4,180 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Olrac Adverse - Premium Advertising Platform for Physical Screen Ad Slot Booking" />
+    <meta name="color-scheme" content="light" />
+    <meta
+      name="description"
+      content="Olrac Adverse - Premium Advertising Platform for Physical Screen Ad Slot Booking"
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
-    <title>Olrac Adverse — Advertising Platform</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Sora:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <title>Olrac Adverse - Advertising Platform</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #040509;
+      }
+
+      #root {
+        min-height: 100vh;
+      }
+
+      #boot-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 28%),
+          radial-gradient(circle at bottom, rgba(255, 255, 255, 0.06), transparent 34%),
+          #000;
+        transition: opacity 300ms ease;
+      }
+
+      #boot-loader::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 340px;
+        height: 340px;
+        transform: translate(-50%, -50%);
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 34%, transparent 72%);
+        filter: blur(40px);
+      }
+
+      #boot-loader::after {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 420px;
+        height: 420px;
+        transform: translate(-50%, -50%);
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.03);
+        filter: blur(28px);
+      }
+
+      .boot-loader-core {
+        position: relative;
+        width: 144px;
+        height: 144px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .boot-loader-core::before,
+      .boot-loader-core::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+      }
+
+      .boot-loader-core::before {
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .boot-loader-core::after {
+        inset: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .boot-loader-haze {
+        position: absolute;
+        inset: 20px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.03);
+        filter: blur(24px);
+      }
+
+      .boot-loader-orbit {
+        position: absolute;
+        inset: 0;
+        animation: boot-loader-spin 1.35s linear infinite;
+      }
+
+      .boot-loader-orbit::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 0;
+        width: 10px;
+        height: 10px;
+        transform: translate(-50%, -50%);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.85);
+      }
+
+      .boot-loader-brand {
+        position: relative;
+        z-index: 1;
+        padding-left: 0.55em;
+        color: rgba(255, 255, 255, 0.58);
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.55em;
+        text-transform: uppercase;
+      }
+
+      @keyframes boot-loader-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      #boot-loader.boot-loader-hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
   </head>
   <body>
+    <div id="boot-loader" aria-live="polite" aria-label="Loading Olrac">
+      <div class="boot-loader-core">
+        <div class="boot-loader-haze"></div>
+        <div class="boot-loader-orbit"></div>
+        <span class="boot-loader-brand">OLRAC</span>
+      </div>
+    </div>
     <div id="root"></div>
+    <script>
+      window.__olracBootStartedAt = Date.now()
+
+      window.__olracHideBootLoader = function () {
+        var loader = document.getElementById('boot-loader')
+        var startedAt = window.__olracBootStartedAt || Date.now()
+        var elapsed = Date.now() - startedAt
+        var remaining = Math.max(0, 450 - elapsed)
+
+        if (!loader || loader.classList.contains('boot-loader-hidden')) {
+          return
+        }
+
+        window.setTimeout(function () {
+          loader.classList.add('boot-loader-hidden')
+          window.setTimeout(function () {
+            loader.remove()
+          }, 320)
+        }, remaining)
+      }
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
