@@ -1,0 +1,85 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install --legacy-peer-deps
+
+      - name: Build client site
+        working-directory: frontend
+        env:
+          VITE_SITE_MODE: client
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_CLIENT_SITE_URL: ${{ secrets.VITE_CLIENT_SITE_URL }}
+          VITE_ADMIN_SITE_URL: ${{ secrets.VITE_ADMIN_SITE_URL }}
+        run: npm run build:client
+
+      - name: Build admin site
+        working-directory: frontend
+        env:
+          VITE_SITE_MODE: admin
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_CLIENT_SITE_URL: ${{ secrets.VITE_CLIENT_SITE_URL }}
+          VITE_ADMIN_SITE_URL: ${{ secrets.VITE_ADMIN_SITE_URL }}
+        run: npm run build:admin
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy frontend builds to EC2
+        run: |
+          scp -i ~/.ssh/deploy_key -r frontend/dist/client/. \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/olrac-client/
+          scp -i ~/.ssh/deploy_key -r frontend/dist/admin/. \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/olrac-admin/
+
+      - name: Deploy on EC2
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'ENDSSH'
+            set -e
+
+            # Pull latest backend code
+            cd /home/ubuntu/olrac
+            git pull origin main
+
+            # Install any new Python dependencies
+            source backend/venv/bin/activate
+            pip install -r backend/requirements.txt
+
+            # Swap frontend files atomically
+            sudo rm -rf /var/www/olrac/client
+            sudo mkdir -p /var/www/olrac/client
+            sudo cp -r /tmp/olrac-client/. /var/www/olrac/client/
+            rm -rf /tmp/olrac-client
+
+            sudo rm -rf /var/www/olrac/admin
+            sudo mkdir -p /var/www/olrac/admin
+            sudo cp -r /tmp/olrac-admin/. /var/www/olrac/admin/
+            rm -rf /tmp/olrac-admin
+
+            # Restart backend
+            sudo systemctl restart olrac-backend
+
+            echo "Deployment complete."
+          ENDSSH

@@ -1,354 +1,501 @@
 ================================================================
-OLRAC ADVERSE - DEPLOYMENT GUIDE (AWS EC2 + GODADDY)
+OLRAC ADVERSE - DEPLOYMENT GUIDE (AWS EC2 + GODADDY + CI/CD)
 ================================================================
 
 OVERVIEW
 --------
 Host the entire stack on a single AWS EC2 instance using your
-GoDaddy domain olracad.com. Nginx serves both frontends and
-proxies API traffic to FastAPI running via Gunicorn.
+GoDaddy domain olracad.com. Nginx serves both React frontends
+as static files and proxies API/uploads to FastAPI (Gunicorn).
+GitHub Actions auto-deploys on every push to main.
 
   Domain Layout:
-    olracad.com          → React client site
-    admin.olracad.com    → React admin site
-    api.olracad.com      → FastAPI backend
+    olracad.com          -> React client site
+    admin.olracad.com    -> React admin site
+    api.olracad.com      -> FastAPI backend
 
   Stack on EC2:
-    Nginx                → reverse proxy + static file server
-    Gunicorn + Uvicorn   → FastAPI backend (port 8000, internal)
-    PostgreSQL           → database (local on EC2)
-    Let's Encrypt        → free SSL certificates
+    Nginx                -> reverse proxy + static file server
+    Gunicorn + Uvicorn   -> FastAPI backend (port 8000, internal)
+    PostgreSQL           -> database (local on EC2)
+    Let's Encrypt        -> free SSL certificates
+    GitHub Actions       -> CI/CD auto-deploy on push to main
 
 
 ================================================================
-STEP 1 — GoDaddy DNS SETUP
+PART A — FIRST-TIME SERVER SETUP (run once)
 ================================================================
 
-1. Log in to GoDaddy → My Products → Domains → click "DNS"
-   next to olracad.com
+----------------------------------------------------------------
+STEP 1 — SSH INTO EC2 AND INSTALL SYSTEM DEPENDENCIES
+----------------------------------------------------------------
 
-2. Add 4 A records pointing to your EC2 Elastic IP address:
+  ssh -i your-key.pem ubuntu@<EC2-IP>
 
-   Type  | Name    | Value        | TTL
-   ------|---------|--------------|-----
-   A     | @       | <EC2-IP>     | 600
-   A     | www     | <EC2-IP>     | 600
-   A     | admin   | <EC2-IP>     | 600
-   A     | api     | <EC2-IP>     | 600
+  sudo apt update && sudo apt upgrade -y
 
-3. Save and wait 10–30 minutes for DNS to propagate.
+  # Python
+  sudo apt install -y python3 python3-pip python3-venv
 
-NOTE: To find your EC2 Elastic IP → AWS Console → EC2 →
-Elastic IPs. If you don't have one, allocate and associate
-it to your instance first (prevents IP changing on restart).
+  # Node.js 20 LTS
+  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+  sudo apt install -y nodejs
 
+  # Nginx, Certbot, PostgreSQL, Git, rsync
+  sudo apt install -y nginx certbot python3-certbot-nginx \
+    postgresql postgresql-contrib git rsync
 
-================================================================
-STEP 2 — EC2 SERVER SETUP
-================================================================
-
-SSH into your EC2 instance and install all dependencies:
-
-   sudo apt update && sudo apt upgrade -y
-
-   # Python
-   sudo apt install -y python3 python3-pip python3-venv
-
-   # Node.js 20 LTS
-   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-   sudo apt install -y nodejs
-
-   # Nginx, Certbot, PostgreSQL
-   sudo apt install -y nginx certbot python3-certbot-nginx \
-     postgresql postgresql-contrib
-
-   # Playwright system dependencies (for PDF invoice generation)
-   sudo apt install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 \
-     libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
-     libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2
-
-IMPORTANT: In AWS Console → EC2 → Security Groups → Inbound Rules,
-make sure ports 22, 80, and 443 are open.
+  # Playwright system deps (for PDF invoice generation)
+  sudo apt install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 \
+    libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
+    libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2
 
 
-================================================================
-STEP 3 — POSTGRESQL DATABASE SETUP
-================================================================
+----------------------------------------------------------------
+STEP 2 — EC2 SECURITY GROUP (AWS Console)
+----------------------------------------------------------------
 
-   sudo -u postgres psql
+In AWS Console -> EC2 -> Security Groups -> Inbound Rules,
+ensure these ports are open:
 
-   # Inside psql, run:
-   CREATE DATABASE olrac;
-   CREATE USER olracuser WITH PASSWORD 'YourStrongPassword';
-   GRANT ALL PRIVILEGES ON DATABASE olrac TO olracuser;
-   \q
-
-Your DATABASE_URL will be:
-   postgresql://olracuser:YourStrongPassword@localhost:5432/olrac
+  Port 22   (SSH)
+  Port 80   (HTTP)
+  Port 443  (HTTPS)
 
 
-================================================================
-STEP 4 — DEPLOY THE BACKEND
-================================================================
+----------------------------------------------------------------
+STEP 3 — POSTGRESQL DATABASE
+----------------------------------------------------------------
 
---- 4a. Clone the project ---
+  sudo -u postgres psql
 
-   git clone https://github.com/roshannandhu/Olrac.git /home/ubuntu/olrac
+  -- Inside psql:
+  CREATE DATABASE olrac;
+  CREATE USER olracuser WITH PASSWORD 'YourStrongPassword';
+  GRANT ALL PRIVILEGES ON DATABASE olrac TO olracuser;
+  \q
 
---- 4b. Set up Python environment ---
+Your DATABASE_URL:
+  postgresql://olracuser:YourStrongPassword@localhost:5432/olrac
 
-   cd /home/ubuntu/olrac/backend
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   pip install gunicorn
 
-   # Install Playwright browser (for PDF invoices)
-   python -m playwright install chromium
-   python -m playwright install-deps chromium
+----------------------------------------------------------------
+STEP 4 — UPLOAD PROJECT FILES TO EC2
+----------------------------------------------------------------
 
---- 4c. Create the backend .env file ---
+Run this from your LOCAL machine (Windows: use Git Bash or WSL):
 
-   nano /home/ubuntu/olrac/backend/.env
+  rsync -avz --exclude 'node_modules' --exclude '__pycache__' \
+    --exclude '.env' --exclude 'venv' --exclude 'dist' \
+    -e "ssh -i your-key.pem" \
+    /path/to/olrac/ ubuntu@<EC2-IP>:/home/ubuntu/olrac/
 
-Paste and fill in:
+Or clone directly on EC2 if the repo is on GitHub:
 
-   DATABASE_URL=postgresql://olracuser:YourStrongPassword@localhost:5432/olrac
+  git clone https://github.com/roshannandhu/Olrac.git /home/ubuntu/olrac
 
-   JWT_SECRET_KEY=<run: openssl rand -hex 32>
-   JWT_ALGORITHM=HS256
-   JWT_EXPIRY_MINUTES=1440
 
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=587
-   SMTP_USER=your@gmail.com
-   SMTP_PASSWORD=your-gmail-app-password
-   SMTP_FROM_NAME=Olrac
+----------------------------------------------------------------
+STEP 5 — BACKEND SETUP
+----------------------------------------------------------------
 
-   GROQ_API_KEY=your-groq-api-key
-   GROQ_MODEL=llama3-70b-8192
+--- 5a. Python virtual environment ---
 
-   WHATSAPP_ADMIN_NUMBER=919876543210
+  cd /home/ubuntu/olrac/backend
+  python3 -m venv venv
+  source venv/bin/activate
+  pip install -r requirements.txt
 
-   DEFAULT_ADMIN_NAME=Admin
-   DEFAULT_ADMIN_EMAIL=admin@olracad.com
-   DEFAULT_ADMIN_PASSWORD=YourStrongAdminPassword
-   DEFAULT_ADMIN_SYNC_PASSWORD=true
+  # Install Playwright browser (needed for PDF invoice generation)
+  python -m playwright install chromium
+  python -m playwright install-deps chromium
 
-   CORS_ORIGINS=https://olracad.com,https://www.olracad.com,https://admin.olracad.com
-   CORS_ORIGIN_REGEX=
+--- 5b. Create the backend .env file ---
 
---- 4d. Create the systemd service ---
+  nano /home/ubuntu/olrac/backend/.env
 
-   sudo nano /etc/systemd/system/olrac-backend.service
+Paste and fill in real values:
+
+  DATABASE_URL=postgresql://olracuser:YourStrongPassword@localhost:5432/olrac
+
+  JWT_SECRET_KEY=<run: openssl rand -hex 32>
+  JWT_ALGORITHM=HS256
+  JWT_EXPIRY_MINUTES=1440
+
+  SMTP_HOST=smtp.gmail.com
+  SMTP_PORT=587
+  SMTP_USER=your@gmail.com
+  SMTP_PASSWORD=your-gmail-app-password
+  SMTP_FROM_NAME=Olrac
+
+  GROQ_API_KEY=your-groq-api-key
+  GROQ_MODEL=llama3-70b-8192
+
+  WHATSAPP_ADMIN_NUMBER=919876543210
+
+  DEFAULT_ADMIN_NAME=Admin
+  DEFAULT_ADMIN_EMAIL=admin@olracad.com
+  DEFAULT_ADMIN_PASSWORD=YourStrongAdminPassword
+  DEFAULT_ADMIN_SYNC_PASSWORD=true
+
+  CORS_ORIGINS=https://olracad.com,https://www.olracad.com,https://admin.olracad.com
+  CORS_ORIGIN_REGEX=
+
+--- 5c. Create systemd service for FastAPI ---
+
+  sudo nano /etc/systemd/system/olrac-backend.service
 
 Paste:
 
-   [Unit]
-   Description=Olrac FastAPI Backend
-   After=network.target postgresql.service
+  [Unit]
+  Description=Olrac FastAPI Backend
+  After=network.target postgresql.service
 
-   [Service]
-   User=ubuntu
-   WorkingDirectory=/home/ubuntu/olrac/backend
-   Environment="PATH=/home/ubuntu/olrac/backend/venv/bin"
-   EnvironmentFile=/home/ubuntu/olrac/backend/.env
-   ExecStart=/home/ubuntu/olrac/backend/venv/bin/gunicorn app.main:app \
-     -w 2 -k uvicorn.workers.UvicornWorker \
-     --bind 127.0.0.1:8000 \
-     --timeout 120
-   Restart=always
+  [Service]
+  User=ubuntu
+  WorkingDirectory=/home/ubuntu/olrac/backend
+  Environment="PATH=/home/ubuntu/olrac/backend/venv/bin"
+  EnvironmentFile=/home/ubuntu/olrac/backend/.env
+  ExecStart=/home/ubuntu/olrac/backend/venv/bin/gunicorn app.main:app \
+    -w 2 -k uvicorn.workers.UvicornWorker \
+    --bind 127.0.0.1:8000 \
+    --timeout 120
+  Restart=always
 
-   [Install]
-   WantedBy=multi-user.target
+  [Install]
+  WantedBy=multi-user.target
 
-Enable and start:
+  sudo systemctl daemon-reload
+  sudo systemctl enable olrac-backend
+  sudo systemctl start olrac-backend
 
-   sudo systemctl daemon-reload
-   sudo systemctl enable olrac-backend
-   sudo systemctl start olrac-backend
-
-Test it:
-
-   curl http://127.0.0.1:8000/health
-   # Should return: {"status":"healthy"}
+  # Verify it works:
+  curl http://127.0.0.1:8000/health
+  # Expected: {"status":"healthy"}
 
 
-================================================================
-STEP 5 — BUILD THE FRONTENDS
-================================================================
+----------------------------------------------------------------
+STEP 6 — BUILD THE FRONTENDS ON EC2
+----------------------------------------------------------------
 
---- 5a. Build the client site (olracad.com) ---
+  cd /home/ubuntu/olrac/frontend
+  npm install --legacy-peer-deps
 
-   cd /home/ubuntu/olrac/frontend
-   npm install --legacy-peer-deps
+--- 6a. Create frontend production env ---
 
-   VITE_SITE_MODE=client \
-   VITE_API_BASE_URL=https://api.olracad.com \
-   VITE_CLIENT_SITE_URL=https://olracad.com \
-   VITE_ADMIN_SITE_URL=https://admin.olracad.com \
-   npm run build:client
+  cat > .env.production << 'EOF'
+  VITE_API_BASE_URL=https://api.olracad.com
+  VITE_CLIENT_SITE_URL=https://olracad.com
+  VITE_ADMIN_SITE_URL=https://admin.olracad.com
+  EOF
 
---- 5b. Build the admin site (admin.olracad.com) ---
+--- 6b. Build both sites ---
 
-   VITE_SITE_MODE=admin \
-   VITE_API_BASE_URL=https://api.olracad.com \
-   VITE_CLIENT_SITE_URL=https://olracad.com \
-   VITE_ADMIN_SITE_URL=https://admin.olracad.com \
-   npm run build:admin
+  npm run build:client   # outputs to dist/client
+  npm run build:admin    # outputs to dist/admin
 
---- 5c. Copy built files to web root ---
+--- 6c. Copy to Nginx web root ---
 
-   sudo mkdir -p /var/www/olrac/client
-   sudo mkdir -p /var/www/olrac/admin
+  sudo mkdir -p /var/www/olrac/client
+  sudo mkdir -p /var/www/olrac/admin
 
-   sudo cp -r dist/client/. /var/www/olrac/client/
-   sudo cp -r dist/admin/. /var/www/olrac/admin/
+  sudo cp -r dist/client/. /var/www/olrac/client/
+  sudo cp -r dist/admin/.  /var/www/olrac/admin/
 
 
-================================================================
-STEP 6 — NGINX CONFIGURATION
-================================================================
+----------------------------------------------------------------
+STEP 7 — NGINX CONFIGURATION
+----------------------------------------------------------------
 
---- 6a. Client site ---
+--- 7a. Client site (olracad.com) ---
 
-   sudo nano /etc/nginx/sites-available/olrac-client
+  sudo nano /etc/nginx/sites-available/olrac-client
 
 Paste:
 
-   server {
-       listen 80;
-       server_name olracad.com www.olracad.com;
-       root /var/www/olrac/client;
-       index index.html;
+  server {
+      listen 80;
+      server_name olracad.com www.olracad.com;
+      root /var/www/olrac/client;
+      index index.html;
 
-       location / {
-           try_files $uri $uri/ /index.html;
-       }
-   }
+      location / {
+          try_files $uri $uri/ /index.html;
+      }
+  }
 
---- 6b. Admin site ---
+--- 7b. Admin site (admin.olracad.com) ---
 
-   sudo nano /etc/nginx/sites-available/olrac-admin
-
-Paste:
-
-   server {
-       listen 80;
-       server_name admin.olracad.com;
-       root /var/www/olrac/admin;
-       index index.html;
-
-       location / {
-           try_files $uri $uri/ /index.html;
-       }
-   }
-
---- 6c. API ---
-
-   sudo nano /etc/nginx/sites-available/olrac-api
+  sudo nano /etc/nginx/sites-available/olrac-admin
 
 Paste:
 
-   server {
-       listen 80;
-       server_name api.olracad.com;
+  server {
+      listen 80;
+      server_name admin.olracad.com;
+      root /var/www/olrac/admin;
+      index index.html;
 
-       client_max_body_size 100M;
+      location / {
+          try_files $uri $uri/ /index.html;
+      }
+  }
 
-       location / {
-           proxy_pass http://127.0.0.1:8000;
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-           proxy_set_header X-Forwarded-Proto $scheme;
-           proxy_read_timeout 120s;
-       }
-   }
+--- 7c. API (api.olracad.com) ---
 
---- 6d. Enable and reload ---
+  sudo nano /etc/nginx/sites-available/olrac-api
 
-   sudo ln -s /etc/nginx/sites-available/olrac-client /etc/nginx/sites-enabled/
-   sudo ln -s /etc/nginx/sites-available/olrac-admin  /etc/nginx/sites-enabled/
-   sudo ln -s /etc/nginx/sites-available/olrac-api    /etc/nginx/sites-enabled/
+Paste:
 
-   sudo nginx -t
-   sudo systemctl reload nginx
+  server {
+      listen 80;
+      server_name api.olracad.com;
+
+      client_max_body_size 100M;
+
+      location / {
+          proxy_pass http://127.0.0.1:8000;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_read_timeout 120s;
+      }
+  }
+
+--- 7d. Enable and reload ---
+
+  sudo ln -s /etc/nginx/sites-available/olrac-client /etc/nginx/sites-enabled/
+  sudo ln -s /etc/nginx/sites-available/olrac-admin  /etc/nginx/sites-enabled/
+  sudo ln -s /etc/nginx/sites-available/olrac-api    /etc/nginx/sites-enabled/
+
+  sudo nginx -t
+  sudo systemctl reload nginx
+
+
+----------------------------------------------------------------
+STEP 8 — GODADDY DNS SETUP
+----------------------------------------------------------------
+
+Log in to GoDaddy -> My Products -> Domains -> DNS (olracad.com)
+
+Add 4 A records pointing to your EC2 Elastic IP:
+
+  Type  | Name    | Value        | TTL
+  ------|---------|--------------|-----
+  A     | @       | <EC2-IP>     | 600
+  A     | www     | <EC2-IP>     | 600
+  A     | admin   | <EC2-IP>     | 600
+  A     | api     | <EC2-IP>     | 600
+
+NOTE: EC2 Elastic IP -> AWS Console -> EC2 -> Elastic IPs.
+Allocate one and associate it to the instance if not done yet
+(prevents IP from changing on every instance restart).
+
+Wait 10-30 minutes for DNS propagation, then proceed.
+
+
+----------------------------------------------------------------
+STEP 9 — SSL CERTIFICATES (Let's Encrypt)
+----------------------------------------------------------------
+
+  sudo certbot --nginx -d olracad.com -d www.olracad.com
+  sudo certbot --nginx -d admin.olracad.com
+  sudo certbot --nginx -d api.olracad.com
+
+  # Verify auto-renewal timer is active:
+  sudo systemctl status certbot.timer
 
 
 ================================================================
-STEP 7 — SSL CERTIFICATES (Let's Encrypt)
+PART B — GITHUB ACTIONS CI/CD (AUTO-DEPLOY ON PUSH)
 ================================================================
 
-   sudo certbot --nginx -d olracad.com -d www.olracad.com
-   sudo certbot --nginx -d admin.olracad.com
-   sudo certbot --nginx -d api.olracad.com
+After the server is fully set up, configure GitHub Actions so
+every push to main automatically builds and deploys.
 
-Certbot automatically edits the Nginx configs to redirect HTTP
-to HTTPS and installs auto-renewal. Verify auto-renewal with:
+----------------------------------------------------------------
+STEP 10 — ALLOW GITHUB ACTIONS TO RESTART THE BACKEND
+----------------------------------------------------------------
 
-   sudo systemctl status certbot.timer
+On the EC2 server, allow ubuntu to restart the service without
+a password prompt (required for non-interactive CI/CD):
+
+  sudo visudo
+
+Add this line at the bottom:
+
+  ubuntu ALL=(ALL) NOPASSWD: /bin/systemctl restart olrac-backend
+
+Save and exit (Ctrl+X, Y, Enter in nano).
+
+
+----------------------------------------------------------------
+STEP 11 — ADD GITHUB SECRETS
+----------------------------------------------------------------
+
+In GitHub -> your repo -> Settings -> Secrets and variables
+-> Actions -> New repository secret. Add these secrets:
+
+  Secret Name         | Value
+  --------------------|-----------------------------------------------
+  EC2_HOST            | Your EC2 Elastic IP (e.g. 13.235.xx.xx)
+  EC2_USER            | ubuntu
+  EC2_SSH_KEY         | Contents of your .pem private key file
+                      | (open the .pem file, copy ALL text including
+                      |  -----BEGIN RSA PRIVATE KEY----- lines)
+  VITE_API_BASE_URL   | https://api.olracad.com
+  VITE_CLIENT_SITE_URL| https://olracad.com
+  VITE_ADMIN_SITE_URL | https://admin.olracad.com
+
+
+----------------------------------------------------------------
+STEP 12 — CREATE GITHUB ACTIONS WORKFLOW FILE
+----------------------------------------------------------------
+
+Create this file in your repo:
+  .github/workflows/deploy.yml
+
+Contents:
+
+  name: Deploy to EC2
+
+  on:
+    push:
+      branches: [main]
+
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+
+        - name: Set up Node.js
+          uses: actions/setup-node@v4
+          with:
+            node-version: '20'
+
+        - name: Install frontend dependencies
+          working-directory: frontend
+          run: npm install --legacy-peer-deps
+
+        - name: Build client site
+          working-directory: frontend
+          env:
+            VITE_SITE_MODE: client
+            VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+            VITE_CLIENT_SITE_URL: ${{ secrets.VITE_CLIENT_SITE_URL }}
+            VITE_ADMIN_SITE_URL: ${{ secrets.VITE_ADMIN_SITE_URL }}
+          run: npm run build:client
+
+        - name: Build admin site
+          working-directory: frontend
+          env:
+            VITE_SITE_MODE: admin
+            VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+            VITE_CLIENT_SITE_URL: ${{ secrets.VITE_CLIENT_SITE_URL }}
+            VITE_ADMIN_SITE_URL: ${{ secrets.VITE_ADMIN_SITE_URL }}
+          run: npm run build:admin
+
+        - name: Set up SSH key
+          run: |
+            mkdir -p ~/.ssh
+            echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+            chmod 600 ~/.ssh/deploy_key
+            ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+        - name: Copy frontend builds to EC2
+          run: |
+            scp -i ~/.ssh/deploy_key -r frontend/dist/client/. \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/olrac-client/
+            scp -i ~/.ssh/deploy_key -r frontend/dist/admin/. \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/olrac-admin/
+
+        - name: Deploy on EC2
+          run: |
+            ssh -i ~/.ssh/deploy_key \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'ENDSSH'
+              set -e
+
+              # Pull latest backend code
+              cd /home/ubuntu/olrac
+              git pull origin main
+
+              # Install any new Python dependencies
+              source backend/venv/bin/activate
+              pip install -r backend/requirements.txt
+
+              # Swap frontend files atomically
+              sudo rm -rf /var/www/olrac/client
+              sudo mkdir -p /var/www/olrac/client
+              sudo cp -r /tmp/olrac-client/. /var/www/olrac/client/
+              rm -rf /tmp/olrac-client
+
+              sudo rm -rf /var/www/olrac/admin
+              sudo mkdir -p /var/www/olrac/admin
+              sudo cp -r /tmp/olrac-admin/. /var/www/olrac/admin/
+              rm -rf /tmp/olrac-admin
+
+              # Restart backend
+              sudo systemctl restart olrac-backend
+
+              echo "Deployment complete."
+            ENDSSH
+
+Once this file is committed and pushed, every future push to
+main will trigger an automatic deploy.
 
 
 ================================================================
-STEP 8 — CODE CHANGE NEEDED (do this before deploying)
+PART C — UPDATING THE APP IN THE FUTURE
 ================================================================
 
-FIX — backend/app/main.py
-Replace these 2 lines:
-   os.makedirs("uploads", exist_ok=True)
-   app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+With CI/CD active, the workflow is simply:
 
-With:
-   from pathlib import Path
-   UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
-   UPLOAD_DIR.mkdir(exist_ok=True)
-   app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+  1. Make code changes locally
+  2. git add . && git commit -m "your message"
+  3. git push origin main
+  4. GitHub Actions builds and deploys automatically (~2-3 min)
 
-WHY: The relative path breaks when Gunicorn is run as a systemd
-service because the working directory may differ from the repo root.
+To monitor a deploy:
+  GitHub -> your repo -> Actions tab -> latest workflow run
 
+To check backend logs on EC2:
+  sudo journalctl -u olrac-backend -f
 
-================================================================
-STEP 9 — REDEPLOYING AFTER CODE CHANGES
-================================================================
-
-Backend:
-   cd /home/ubuntu/olrac && git pull
-   sudo systemctl restart olrac-backend
-
-Frontend (rebuild and recopy):
-   cd /home/ubuntu/olrac/frontend
-   npm install --legacy-peer-deps
-   # run build commands from Step 5 again
-   sudo cp -r dist/client/. /var/www/olrac/client/
-   sudo cp -r dist/admin/.  /var/www/olrac/admin/
+To manually restart backend on EC2:
+  sudo systemctl restart olrac-backend
 
 
 ================================================================
 VERIFICATION CHECKLIST
 ================================================================
 
-[ ] curl https://api.olracad.com/health  → {"status":"healthy"}
-[ ] https://api.olracad.com/docs         → Swagger API docs page
-[ ] https://olracad.com                  → Client site loads
-[ ] https://admin.olracad.com/login      → Admin login page loads
-[ ] Log in with admin email + password   → Dashboard opens
-[ ] Add a screen in admin               → Appears on client map
-[ ] Upload a screen image               → Image loads on client
-[ ] Check backend logs:
-    sudo journalctl -u olrac-backend -f
+[ ] curl https://api.olracad.com/health  -> {"status":"healthy"}
+[ ] https://api.olracad.com/docs         -> Swagger API docs
+[ ] https://olracad.com                  -> Client site loads
+[ ] https://admin.olracad.com/login      -> Admin login loads
+[ ] Log in with admin credentials        -> Dashboard opens
+[ ] Add a screen with image in admin     -> Appears on client map
+[ ] Upload screen media                  -> Media loads on client
+[ ] Submit test booking on client        -> Appears in admin
+[ ] Download invoice PDF from admin      -> PDF generates correctly
+[ ] Push a small change to GitHub        -> CI/CD auto-deploys it
+[ ] Check backend logs: sudo journalctl -u olrac-backend -f
 
 
 ================================================================
 SERVICES SUMMARY
 ================================================================
 
-Service      | URL                               | Cost
--------------|-----------------------------------|-----------
-AWS EC2      | console.aws.amazon.com            | Your plan
-GoDaddy      | godaddy.com (already owned)       | Already paid
-Let's Encrypt| letsencrypt.org                   | Free
-PostgreSQL   | local on EC2                      | Free
+Service        | URL                          | Cost
+---------------|------------------------------|-----------
+AWS EC2        | console.aws.amazon.com       | Your plan
+GoDaddy        | godaddy.com                  | Already paid
+Let's Encrypt  | letsencrypt.org              | Free
+PostgreSQL     | local on EC2                 | Free
+GitHub Actions | github.com (2000 min/mo free)| Free
 
 ================================================================
