@@ -106,13 +106,21 @@ def _selected_location_label(booking: Booking) -> str:
     if not snapshots:
         return "the selected location"
 
-    names = [
-        snapshot.get("name") or snapshot.get("area") or f'Screen #{snapshot.get("id", "N/A")}'
-        for snapshot in snapshots
-    ]
-    if len(names) <= 2:
-        return ", ".join(names)
-    return f"{names[0]}, {names[1]} + {len(names) - 2} more"
+    labels = []
+    for snapshot in snapshots:
+        name = snapshot.get("name") or ""
+        area = snapshot.get("area") or ""
+        sid = snapshot.get("id")
+        # Mirror admin QuotationEditor: fill name from current DB screen when snapshot is stale/empty
+        if not name and booking.screen and booking.screen.id == sid:
+            name = booking.screen.name or ""
+            if not area:
+                area = booking.screen.area or ""
+        labels.append(name or area or f"Screen #{sid or 'N/A'}")
+
+    if len(labels) <= 2:
+        return ", ".join(labels)
+    return f"{labels[0]}, {labels[1]} + {len(labels) - 2} more"
 
 
 def _data_uri_to_bytes(data_uri: str | None) -> bytes | None:
