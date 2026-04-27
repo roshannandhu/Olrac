@@ -96,17 +96,22 @@ export default function Navbar() {
 
           {/* Logo */}
           <Link to="/" className="group flex shrink-0 items-center gap-2.5 md:gap-3.5">
-            <div className={`${isAdminSite ? 'h-10 w-10' : 'h-11 w-11 md:h-14 md:w-14'} rounded-2xl flex items-center justify-center shadow-sm overflow-hidden transition-all group-hover:scale-105 ${isAdminSite
-                ? 'bg-gradient-to-br from-primary-600 to-primary-700'
-                : isTransparent
-                  ? 'bg-white/10 border border-white/20'
-                  : 'bg-blue-700/80 border border-blue-600/30'
-              }`}>
-              {logoUrl
-                ? <img src={logoUrl} alt={appName} className="w-full h-full object-contain p-1" style={{ imageRendering: 'auto' }} />
-                : <Monitor className={`w-6 h-6 ${isAdminSite ? 'text-white' : 'text-white'}`} />
-              }
-            </div>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={appName}
+                className={`${isAdminSite ? 'h-10' : 'h-11 md:h-14'} w-auto object-contain transition-all group-hover:scale-105`}
+              />
+            ) : (
+              <div className={`${isAdminSite ? 'h-10 w-10' : 'h-11 w-11 md:h-14 md:w-14'} rounded-2xl flex items-center justify-center shadow-sm overflow-hidden transition-all group-hover:scale-105 ${isAdminSite
+                  ? 'bg-gradient-to-br from-primary-600 to-primary-700'
+                  : isTransparent
+                    ? 'bg-white/10 border border-white/20'
+                    : 'bg-blue-700/80 border border-blue-600/30'
+                }`}>
+                <Monitor className="w-6 h-6 text-white" />
+              </div>
+            )}
             <span className={`max-w-[170px] truncate text-[1.02rem] font-black leading-none tracking-tight transition-colors sm:text-[1.2rem] md:max-w-none md:text-[1.65rem] ${logoTextColor}`}>
               {appName}
             </span>
