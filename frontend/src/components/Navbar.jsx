@@ -103,7 +103,7 @@ export default function Navbar() {
                   : 'bg-blue-700/80 border border-blue-600/30'
               }`}>
               {logoUrl
-                ? <img src={logoUrl} alt={appName} className="w-full h-full object-cover" />
+                ? <img src={logoUrl} alt={appName} className="w-full h-full object-contain p-1" style={{ imageRendering: 'auto' }} />
                 : <Monitor className={`w-6 h-6 ${isAdminSite ? 'text-white' : 'text-white'}`} />
               }
             </div>
