@@ -106,7 +106,10 @@ def _selected_location_label(booking: Booking) -> str:
     if not snapshots:
         return "the selected location"
 
-    names = [snapshot.get("name") or f'Location #{snapshot.get("id", "N/A")}' for snapshot in snapshots]
+    names = [
+        snapshot.get("name") or snapshot.get("area") or f'Screen #{snapshot.get("id", "N/A")}'
+        for snapshot in snapshots
+    ]
     if len(names) <= 2:
         return ", ".join(names)
     return f"{names[0]}, {names[1]} + {len(names) - 2} more"
