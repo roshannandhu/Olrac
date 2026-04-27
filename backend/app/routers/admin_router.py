@@ -187,8 +187,13 @@ def _normalize_selected_screen_snapshots(booking: Booking) -> tuple[list[dict], 
 
 def _normalized_location_label(booking: Booking) -> str:
     snapshots, _, _ = _normalize_selected_screen_snapshots(booking)
-    labels = [s.get("name") or s.get("area") or f'Screen #{s.get("id", "N/A")}' for s in snapshots]
-    return ", ".join(labels) if labels else ""
+    if snapshots:
+        labels = [s.get("name") or s.get("area") or f'Screen #{s.get("id", "N/A")}' for s in snapshots]
+        return ", ".join(labels)
+    # Mirror admin QuotationEditor fallback: use booking.screen.name when snapshots are unresolvable
+    if booking.screen:
+        return booking.screen.name or booking.screen.area or ""
+    return ""
 
 
 def _booking_to_out(booking: Booking) -> BookingOut:
@@ -530,7 +535,7 @@ async def send_booking_quotation(
         "address": context.get("address") or "",
         "logo_url": context.get("logo_url") or "",
         "seal_url": context.get("seal_url") or "",
-        "location_label": _normalized_location_label(booking) or context.get("location") or "",
+        "location_label": _normalized_location_label(booking),
         "bank_name": context.get("bank_name") or "",
         "account_name": context.get("account_name") or "",
         "account_number": context.get("account_number") or "",
@@ -599,7 +604,7 @@ async def download_booking_quotation_pdf(
         "address": context.get("address") or "",
         "logo_url": context.get("logo_url") or "",
         "seal_url": context.get("seal_url") or "",
-        "location_label": _normalized_location_label(booking) or context.get("location") or "",
+        "location_label": _normalized_location_label(booking),
         "bank_name": context.get("bank_name") or "",
         "account_name": context.get("account_name") or "",
         "account_number": context.get("account_number") or "",
