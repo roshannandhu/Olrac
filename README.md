@@ -1,66 +1,101 @@
-# Olrac Adverse - Advertising Platform
+# Olrac Adverse — Advertising Platform
 
-Olrac Adverse is a full-stack platform for booking ad slots on physical screens. There are two websites that use one shared backend and database:
+Olrac Adverse is a full-stack platform for booking ad slots on physical screens across locations. One shared FastAPI backend powers two separate React frontends built from the same codebase.
 
-- Client site: browse locations, view details, book ad slots
-- Admin site: manage screens, bookings, analytics, invoices, and settings
+- **Client site** (`olracad.com`) — public-facing: browse locations on a map, view screen details, submit booking requests
+- **Admin site** (`admin.olracad.com`) — admin-only: manage screens, review bookings, send quotations, download invoices, view AI analytics, configure settings
 
-This README is a full, step-by-step guide so anyone can run the project and understand how it works.
+---
 
-## What You Can Do In The Product
+## What You Can Do
 
 **Client site**
-
-- Explore locations on a map and in card view
-- Open a location detail page
-- Submit a booking request
-- Continue the conversation via WhatsApp
+- Explore screen locations on an interactive map and card view
+- View screen details, pricing, and available slots
+- Submit a booking request with ad content
+- WhatsApp handoff for quick confirmation
 
 **Admin site**
-
 - Log in with admin credentials
-- Manage screens (add, edit, deactivate)
-- Set location coordinates using a map or geocoding
-- Approve or cancel bookings
+- Add, edit, and deactivate screens
+- Set screen location with a map picker or auto-geocoding
+- Review, approve, or cancel bookings
+- Send quotations to clients (PDF or email)
 - Download invoices as PDF or DOCX
-- Configure invoice branding, signature, notes, and payment details
-- View analytics and AI insights
+- Configure invoice branding, payment details, notes, signature
+- View AI-powered revenue insights and booking analytics
+
+---
 
 ## Tech Stack
 
 | Layer | Technology |
-| --- | --- |
-| Frontend | React 18 + Vite, Tailwind CSS, React Router |
+|-------|-----------|
+| Frontend | React 18 + Vite, Tailwind CSS, React Router, Framer Motion |
 | Maps | Leaflet + OpenStreetMap |
-| Backend | FastAPI, SQLAlchemy, Pydantic v2 |
+| Backend | FastAPI, SQLAlchemy, Pydantic v2, Gunicorn |
 | Database | PostgreSQL |
-| AI | Groq API |
-| Email | SMTP |
+| PDF Generation | Playwright (Chromium) |
+| AI | Groq API (llama3-70b-8192) |
+| Email | SMTP (Gmail) |
+| Deployment | AWS EC2 + Nginx + Let's Encrypt |
+| CI/CD | GitHub Actions (auto-deploy on push to main) |
 
-## Project Structure (Simple Map)
+---
 
-- `backend/` FastAPI server, database models, routers, invoice services
-- `backend/uploads/` Uploaded screen images
-- `frontend/` Vite React app (client + admin)
-- `frontend/src/pages/` All main pages
+## Project Structure
 
-## How Client And Admin Sites Are Built
+```
+olrac/
+  backend/
+    app/
+      main.py              # FastAPI app entry point
+      config.py            # All env vars
+      models.py            # SQLAlchemy ORM models
+      schemas.py           # Pydantic request/response schemas
+      database.py          # DB engine + session
+      default_admin.py     # Seeds default admin on first boot
+      schema_maintenance.py# Runtime ALTER TABLE migrations
+      routers/
+        auth_router.py     # Login, OTP password reset
+        screens_router.py  # Public screens API
+        bookings_router.py # Public booking submission
+        admin_router.py    # All admin CRUD + invoice endpoints
+        ai_router.py       # AI text polish + insights
+        public_settings_router.py
+      invoice_service.py   # PDF + DOCX invoice generation
+      quotation_service.py # Quotation data attached to bookings
+      ai_service.py        # Groq API integration
+      email_service.py     # SMTP email sending
+      otp_service.py       # In-memory OTP store
+      settings_service.py  # Read/write SystemSettings JSON
+    uploads/               # Uploaded screen images/videos
+    requirements.txt
+    .env.example
+  frontend/
+    src/
+      pages/               # All pages (Landing, Locations, Booking, Admin*)
+      components/          # Shared + admin-specific UI components
+      context/             # Auth + PublicSettings context
+      utils/siteMode.js    # isAdminSite, adminPath() helpers
+      api/axios.js         # Axios instance with JWT + proxy
+    package.json
+  .github/
+    workflows/
+      deploy.yml           # GitHub Actions CI/CD
+  DEPLOYMENT_GUIDE.txt     # Full EC2 + GoDaddy deployment guide
+```
 
-The frontend is a single codebase that builds into two separate sites:
+---
 
-- Client build goes to `frontend/dist/client`
-- Admin build goes to `frontend/dist/admin`
+## Local Development
 
-During development:
-
-- Client runs at `http://localhost:5173`
-- Admin runs at `http://localhost:5174`
-
-## Quick Start (Local)
+### Prerequisites
+- Python 3.11+
+- Node.js 20+
+- PostgreSQL running locally
 
 ### 1. Database
-
-Create a local database:
 
 ```sql
 CREATE DATABASE olrac_db;
@@ -71,207 +106,152 @@ CREATE DATABASE olrac_db;
 ```bash
 cd backend
 cp .env.example .env
+# Fill in DATABASE_URL and other values in .env
 pip install -r requirements.txt
-python -m uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 8001
 ```
 
-The backend auto-creates tables and seeds a default admin user:
-
+Tables are created automatically on startup. A default admin is seeded:
 - Email: `admin@olrac.com`
 - Password: `admin123`
+
+For PDF invoice generation, install Playwright once:
+
+```bash
+python -m playwright install chromium
+```
 
 ### 3. Frontend
 
 ```bash
 cd frontend
 npm install --legacy-peer-deps
-npm run dev:client
+
+npm run dev:client   # Client site -> http://localhost:5173
+npm run dev:admin    # Admin site  -> http://localhost:5174
 ```
 
-Open client site: `http://localhost:5173`
+---
 
-In another terminal:
-
-```bash
-cd frontend
-npm run dev:admin
-```
-
-Open admin site: `http://localhost:5174`
-
-## Environment Variables (Explained Clearly)
+## Environment Variables
 
 ### Backend (`backend/.env`)
 
 | Variable | Description |
-| --- | --- |
+|----------|-------------|
 | `DATABASE_URL` | PostgreSQL connection string |
-| `JWT_SECRET_KEY` | Secret for signing JWTs |
-| `JWT_ALGORITHM` | JWT algorithm (default `HS256`) |
-| `JWT_EXPIRY_MINUTES` | JWT expiry in minutes |
+| `JWT_SECRET_KEY` | Secret for signing JWTs (`openssl rand -hex 32`) |
+| `JWT_ALGORITHM` | `HS256` |
+| `JWT_EXPIRY_MINUTES` | Token lifetime in minutes |
 | `GROQ_API_KEY` | Groq API key for AI features |
-| `GROQ_MODEL` | Groq model name (default `llama3-70b-8192`) |
-| `SMTP_HOST` / `SMTP_PORT` | Email server host and port |
-| `SMTP_USER` / `SMTP_PASSWORD` | Email credentials |
-| `WHATSAPP_ADMIN_NUMBER` | Default WhatsApp number |
-| `CORS_ORIGINS` | Comma-separated list of allowed frontend origins |
-| `CORS_ORIGIN_REGEX` | Regex for local dev origins |
+| `GROQ_MODEL` | Model name (default `llama3-70b-8192`) |
+| `SMTP_HOST` / `SMTP_PORT` | Email server |
+| `SMTP_USER` / `SMTP_PASSWORD` | Email credentials (use Gmail App Password) |
+| `SMTP_FROM_NAME` | Display name for emails |
+| `WHATSAPP_ADMIN_NUMBER` | Admin WhatsApp number (international format) |
+| `CORS_ORIGINS` | Comma-separated allowed frontend origins |
+| `CORS_ORIGIN_REGEX` | Regex for dev origins |
+| `DEFAULT_ADMIN_EMAIL` | Seeded admin email |
+| `DEFAULT_ADMIN_PASSWORD` | Seeded admin password |
+| `DEFAULT_ADMIN_SYNC_PASSWORD` | `true` to update password on restart |
 
 ### Frontend (`frontend/.env.local`)
 
 | Variable | Description |
-| --- | --- |
-| `VITE_API_TARGET` | Dev proxy target (default `http://localhost:8000`) |
-| `VITE_API_BASE_URL` | Optional production API base URL |
+|----------|-------------|
+| `VITE_API_TARGET` | Dev proxy target (default `http://localhost:8001`) |
 | `VITE_SITE_MODE` | `client` or `admin` |
-| `VITE_ADMIN_SITE_URL` | Admin site URL for redirects |
-| `VITE_CLIENT_SITE_URL` | Client site URL for redirects |
+| `VITE_API_BASE_URL` | Production API base URL |
+| `VITE_CLIENT_SITE_URL` | Client site URL |
+| `VITE_ADMIN_SITE_URL` | Admin site URL |
+
+---
 
 ## Frontend Scripts
 
 ```bash
-npm run dev:client   # Client site on :5173
-npm run dev:admin    # Admin site on :5174
-npm run build:client # Build client to dist/client
-npm run build:admin  # Build admin to dist/admin
+npm run dev:client    # Dev server for client site on :5173
+npm run dev:admin     # Dev server for admin site on :5174
+npm run build:client  # Production build -> dist/client
+npm run build:admin   # Production build -> dist/admin
 ```
 
-## Cloudflare Custom Domains
+---
 
-To expose the two frontend sites on your own domain with a Named Cloudflare Tunnel, use this mapping:
+## Dual-Site Architecture
 
-- `https://olrac.com` -> client frontend on `http://127.0.0.1:5173`
-- `https://admin.olrac.com` -> admin frontend on `http://127.0.0.1:5174`
+The entire frontend is one codebase that builds into two separate sites. `VITE_SITE_MODE` (set to `client` or `admin`) controls which site is built. `src/utils/siteMode.js` exposes `isAdminSite` and helpers used throughout. `App.jsx` renders `<AdminRoutes>` or `<ClientRoutes>` based on this flag.
 
-Before starting the tunnel, make sure the following local services are already running:
+---
 
-- Backend on `http://127.0.0.1:8001`
-- Client frontend on `http://127.0.0.1:5173`
-- Admin frontend on `http://127.0.0.1:5174`
+## Key Behaviors
 
-Authenticate `cloudflared` and create the tunnel:
+- **No Alembic** — new DB columns are added via `schema_maintenance.py` ALTER TABLE on startup
+- **AI failures are non-blocking** — polishing and insights calls degrade gracefully
+- **OTP store is in-memory** — restarting the backend invalidates pending OTPs
+- **Uploads** — screen images/videos stored in `backend/uploads/`, served at `/uploads`
+- **JWT** — stored in `localStorage` as `olrac_token`, admin routes use `ProtectedRoute adminOnly`
 
-```powershell
-.tools\cloudflared.exe tunnel login
-.tools\cloudflared.exe tunnel create olrac-sites
-.tools\cloudflared.exe tunnel route dns olrac-sites olrac.com
-.tools\cloudflared.exe tunnel route dns olrac-sites admin.olrac.com
-```
+---
 
-Use the tunnel UUID returned by `tunnel create` and start the tunnel with the helper script:
+## API Overview
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .tools\start-olrac-cloudflare.ps1 -TunnelId <YOUR_TUNNEL_UUID>
-```
+Base URL (dev): `http://localhost:8001`
 
-The helper script writes `.tools/olrac-tunnel-config.local.yml` and runs a tunnel with this ingress:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/screens` | Public list of screens |
+| `GET` | `/api/screens/{id}` | Screen details |
+| `POST` | `/api/bookings` | Submit booking |
+| `POST` | `/api/auth/login` | Admin login |
+| `GET` | `/api/admin/screens` | Admin screens list |
+| `POST` | `/api/admin/screens` | Create screen |
+| `PUT` | `/api/admin/screens/{id}` | Update screen |
+| `POST` | `/api/admin/bookings/{id}/status` | Update booking status |
+| `GET` | `/api/admin/bookings/{id}/invoice` | Download invoice |
+| `POST` | `/api/admin/bookings/{id}/send-quotation` | Send quotation email |
+| `POST` | `/api/ai/polish` | AI ad text polishing |
+| `GET` | `/api/admin/insights` | AI analytics |
+| `GET` | `/health` | Health check |
 
-- `olrac.com` -> `127.0.0.1:5173`
-- `admin.olrac.com` -> `127.0.0.1:5174`
+Full interactive docs at: `http://localhost:8001/docs`
 
-If your credentials file is not in the default Cloudflare location, pass it explicitly:
+---
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .tools\start-olrac-cloudflare.ps1 -TunnelId <YOUR_TUNNEL_UUID> -CredentialsFile C:\Users\YOUR_USER\.cloudflared\<YOUR_TUNNEL_UUID>.json
-```
+## Deployment
 
-## Core User Flows (Easy Overview)
+Deployed on AWS EC2 with GoDaddy domain `olracad.com`. See **DEPLOYMENT_GUIDE.txt** for the full step-by-step guide covering:
 
-**Client flow**
+- EC2 server setup and PostgreSQL
+- Backend systemd service (Gunicorn + UvicornWorker)
+- Nginx configuration for all 3 subdomains
+- GoDaddy DNS setup
+- Let's Encrypt SSL
+- GitHub Actions CI/CD (auto-deploy on push to main)
 
-1. Open `/locations`
-2. Map shows all locations with markers
-3. Click card to zoom map to that location
-4. Click marker to highlight that card
-5. Open details and submit booking form
-6. WhatsApp handoff for quick confirmation
+**Production URLs:**
 
-**Admin flow**
+| Site | URL |
+|------|-----|
+| Client | https://olracad.com |
+| Admin | https://admin.olracad.com |
+| API | https://api.olracad.com |
 
-1. Login at `/login` on admin site
-2. Add a new screen with price and slots
-3. Set latitude/longitude using the map or autofill
-4. Review bookings and download invoices
-5. Update invoice branding and payment settings
+---
 
-## Maps: How It Works
-
-- Map uses Leaflet with OpenStreetMap tiles
-- All locations appear automatically on load (auto-zoom)
-- Card hover highlights marker
-- Card click centers map on that location
-- Marker click scrolls to the card
-- Search filters cards and updates map markers
-
-## Admin Screens: Adding A Location Correctly
-
-1. Open Admin -> Screens
-2. Fill name, area, description, prices, slots
-3. Use **Auto-fill from area** to get coordinates
-4. Adjust pin manually on the map if needed
-5. Save, then the location appears on the client map
-
-## Invoices: What Can Be Customized
-
-Admin Settings -> Invoice includes:
-
-- Invoice title and prefix
-- Logo and seal
-- Primary color
-- Signature name and title
-- Payment terms, notes, footer note
-- Bank name, account name/number, IFSC, UPI
-
-Invoices can be downloaded in **PDF** or **DOCX**.
-
-For PDF generation, install Playwright browsers once:
-
-```bash
-python -m playwright install
-```
-
-## AI Features
-
-- Public ad text polishing: `/api/ai/polish`
-- Admin-only insights and revenue summaries
-- AI failures do not block bookings
-
-## API Overview (Key Endpoints)
-
-Base URL: `http://localhost:8000`
-
-- `GET /api/screens` Public list of screens
-- `GET /api/screens/{id}` Screen details
-- `POST /api/bookings` Create booking
-- `POST /api/auth/login` Admin login
-- `GET /api/admin/screens` Admin screens list
-- `POST /api/admin/screens` Create screen
-- `PUT /api/admin/screens/{id}` Update screen
-- `POST /api/admin/bookings/{id}/status` Update booking status
-- `GET /api/admin/bookings/{id}/invoice` Download invoice
-- `POST /api/ai/polish` AI ad text polish
-
-## Deployment Notes (Simple)
-
-- Build the client and admin separately
-- Serve `frontend/dist/client` and `frontend/dist/admin`
-- Both sites must proxy `/api` and `/uploads` to the same backend
-- Or set `VITE_API_BASE_URL` to a hosted API domain
-
-## Troubleshooting (Common Issues)
+## Troubleshooting
 
 **Port already in use**
-
-Stop the existing process or change the port.
+Stop the existing process or change the port in the uvicorn command.
 
 **Map has no markers**
-
-Make sure each screen has `latitude` and `longitude` in Admin -> Screens.
+Ensure each screen has `latitude` and `longitude` set in Admin → Screens.
 
 **Invoice PDF fails**
+Run `python -m playwright install chromium` and restart the backend.
 
-Run `python -m playwright install` and try again.
+**CORS errors in dev**
+Add your frontend URL to `CORS_ORIGINS` in `backend/.env` and restart.
 
-**CORS errors**
-
-Add your frontend URL to `CORS_ORIGINS` in `backend/.env` and restart the backend.
+**OTP not working after backend restart**
+In-memory OTPs are cleared on restart — request a new OTP.
