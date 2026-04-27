@@ -158,7 +158,7 @@ Paste:
   EnvironmentFile=/home/ubuntu/olrac/backend/.env
   ExecStart=/home/ubuntu/olrac/backend/venv/bin/gunicorn app.main:app \
     -w 2 -k uvicorn.workers.UvicornWorker \
-    --bind 127.0.0.1:8000 \
+    --bind 127.0.0.1:8001 \
     --timeout 120
   Restart=always
 
@@ -170,7 +170,7 @@ Paste:
   sudo systemctl start olrac-backend
 
   # Verify it works:
-  curl http://127.0.0.1:8000/health
+  curl http://127.0.0.1:8001/health
   # Expected: {"status":"healthy"}
 
 
@@ -254,7 +254,7 @@ Paste:
       client_max_body_size 100M;
 
       location / {
-          proxy_pass http://127.0.0.1:8000;
+          proxy_pass http://127.0.0.1:8001;
           proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
