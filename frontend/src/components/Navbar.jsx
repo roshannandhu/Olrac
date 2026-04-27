@@ -97,13 +97,15 @@ export default function Navbar() {
           {/* Logo */}
           <Link to="/" className="group flex shrink-0 items-center gap-3 md:gap-4">
             {logoUrl ? (
-              <div className={`${isAdminSite ? 'h-10 w-10' : 'h-11 w-11 md:h-13 md:w-13'} rounded-2xl overflow-hidden shrink-0 ring-1 ring-white/10 shadow-[0_2px_16px_rgba(0,0,0,0.45)] transition-all duration-300 group-hover:scale-105 group-hover:ring-white/25 group-hover:shadow-[0_4px_24px_rgba(0,0,0,0.6)]`}>
-                <img
-                  src={logoUrl}
-                  alt={appName}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+              <img
+                src={logoUrl}
+                alt={appName}
+                className={`${isAdminSite ? 'h-10 w-10' : 'h-12 w-12 md:h-14 md:w-14'} rounded-2xl object-contain shrink-0 transition-all duration-300 group-hover:scale-105`}
+                style={{
+                  imageRendering: '-webkit-optimize-contrast',
+                  filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.5))',
+                }}
+              />
             ) : (
               <div className={`${isAdminSite ? 'h-10 w-10' : 'h-11 w-11 md:h-13 md:w-13'} rounded-2xl flex items-center justify-center shrink-0 ring-1 ring-white/10 shadow-[0_2px_16px_rgba(0,0,0,0.45)] transition-all duration-300 group-hover:scale-105 ${isAdminSite
                   ? 'bg-gradient-to-br from-violet-600 to-indigo-700'
