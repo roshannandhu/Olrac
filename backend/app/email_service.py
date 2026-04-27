@@ -376,7 +376,7 @@ def send_quotation_email(
     phone_c = escape(company.get("phone") or "")
     email_c = escape(company.get("email") or "")
 
-    subject = f"{safe_company} â€" Advertising Quotation"
+    subject = f"{safe_company}  - Advertising Quotation"
 
     cover_html = f"""<!DOCTYPE html>
 <html>
@@ -397,7 +397,7 @@ def send_quotation_email(
 <div class="page">
   <div class="hdr">
     <h1>{safe_company}</h1>
-    <p>Advertising Quotation â€" {safe_campaign}</p>
+    <p>Advertising Quotation  - {safe_campaign}</p>
   </div>
   <div class="body">
     <p>Dear <strong>{safe_client}</strong>,</p>
