@@ -118,9 +118,7 @@ def _selected_location_label(booking: Booking) -> str:
                 area = booking.screen.area or ""
         labels.append(name or area or f"Screen #{sid or 'N/A'}")
 
-    if len(labels) <= 2:
-        return ", ".join(labels)
-    return f"{labels[0]}, {labels[1]} + {len(labels) - 2} more"
+    return ", ".join(labels)
 
 
 def _data_uri_to_bytes(data_uri: str | None) -> bytes | None:
