@@ -257,7 +257,7 @@ export default function QuotationEditor({ booking, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-200 overflow-auto">
-      {/* â”€â”€ Toolbar â”€â”€ */}
+      {/* â"€â"€ Toolbar â"€â"€ */}
       <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm gap-4">
         <button
           onClick={onClose}
@@ -297,7 +297,7 @@ export default function QuotationEditor({ booking, onClose }) {
         </div>
       </div>
 
-      {/* â”€â”€ A4 Document â”€â”€ */}
+      {/* â"€â"€ A4 Document â"€â"€ */}
       <div
         className="mx-auto my-8 bg-white shadow-2xl"
         style={{ width: 794, minHeight: 1123, padding: '52px 56px', fontFamily: "'Segoe UI', Arial, sans-serif" }}
@@ -378,7 +378,7 @@ export default function QuotationEditor({ booking, onClose }) {
                 className="text-[13px] font-medium text-slate-700"
                 placeholder="dd-mm-yyyy"
               />
-              <span className=”text-slate-400 shrink-0”>-</span>
+              <span className="text-slate-400 shrink-0">-</span>
               <EField
                 value={qData.duration_end}
                 onChange={v => update('duration_end', v)}
@@ -503,7 +503,7 @@ export default function QuotationEditor({ booking, onClose }) {
         </div>
       </div>
 
-      {/* â”€â”€ Send Modal â”€â”€ */}
+      {/* â"€â"€ Send Modal â"€â"€ */}
       {sendModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
