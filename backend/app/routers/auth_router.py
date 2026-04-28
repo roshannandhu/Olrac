@@ -103,7 +103,7 @@ def signup(req: SignupRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    token = create_access_token({"sub": user.id, "role": user.role.value})
+    token = create_access_token({"sub": str(user.id), "role": user.role.value})
     return TokenResponse(
         access_token=token,
         user=UserOut.model_validate(user),
@@ -135,7 +135,7 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     _rate_limit_clear(email_key)
     _rate_limit_clear(ip_key)
 
-    token = create_access_token({"sub": user.id, "role": user.role.value})
+    token = create_access_token({"sub": str(user.id), "role": user.role.value})
     return TokenResponse(
         access_token=token,
         user=UserOut.model_validate(user),
