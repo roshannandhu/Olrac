@@ -79,7 +79,7 @@ class Settings:
         origin.strip()
         for origin in os.getenv(
             "CORS_ORIGINS",
-            "http://localhost:5173,http://localhost:5174,https://olrac.com,https://www.olrac.com,https://admin.olrac.com",
+            "http://localhost:5173,http://localhost:5174,https://olracads.com,https://www.olracads.com,https://admin.olracads.com",
         ).split(",")
         if origin.strip()
     ]
