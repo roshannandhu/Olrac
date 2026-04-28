@@ -370,6 +370,11 @@ async def create_booking(
     except Exception:
         logger.warning("AI enrichment unavailable; proceeding without AI fields", exc_info=True)
 
+    if isinstance(ai_category, str) and len(ai_category) > 100:
+        ai_category = None
+    if isinstance(ai_summary, str) and len(ai_summary) > 500:
+        ai_summary = None
+
     booking = Booking(
         user_id=None,
         screen_id=primary_screen.id,

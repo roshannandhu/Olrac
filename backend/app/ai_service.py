@@ -34,7 +34,7 @@ async def _call_groq(system_prompt: str, user_prompt: str) -> str:
             data = resp.json()
             return data["choices"][0]["message"]["content"].strip()
     except Exception as e:
-        return f"[AI error: {str(e)}]"
+        raise RuntimeError(f"AI unavailable: {e}") from e
 
 
 async def polish_text(raw_text: str) -> str:
