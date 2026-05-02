@@ -1,0 +1,49 @@
+# OLRAC Ads
+# TV screen advertising network
+# Remote ad control system
+
+User-agent: *
+Allow: /
+
+# Allow static assets and media.
+Allow: /assets/
+Allow: /uploads/
+Allow: /images/
+Allow: /*.css$
+Allow: /*.js$
+Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.jpeg$
+Allow: /*.webp$
+Allow: /*.svg$
+Allow: /*.gif$
+Allow: /*.mp4$
+
+# Block admin, API, auth, and private routes.
+Disallow: /admin
+Disallow: /admin/
+Disallow: /api
+Disallow: /api/
+Disallow: /auth
+Disallow: /auth/
+Disallow: /login
+Disallow: /signup
+Disallow: /private
+Disallow: /private/
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /settings
+Disallow: /settings/
+Disallow: /bookings
+Disallow: /bookings/
+Disallow: /screens
+Disallow: /screens/
+Disallow: /insights
+Disallow: /insights/
+Disallow: /checkout
+Disallow: /checkout/
+
+# Block query parameter URLs.
+Disallow: /*?*
+
+Sitemap: https://olracads.com/sitemap.xml
