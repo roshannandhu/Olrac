@@ -6,6 +6,8 @@ User-agent: *
 Allow: /
 
 # Allow static assets and media.
+Allow: /favicon.png
+Allow: /preview.jpg
 Allow: /assets/
 Allow: /uploads/
 Allow: /images/

@@ -683,7 +683,7 @@ export default function AdminScreens() {
                       <div className="min-w-0 flex items-center gap-4 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : screen.id)}>
                         <div className="h-14 w-20 shrink-0 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center">
                           {screen.image_url ? (
-                            <img src={screen.image_url} alt="" className="h-full w-full object-cover" />
+                            <img src={screen.image_url} alt={screen.name} className="h-full w-full object-cover" />
                           ) : (
                             <FileImage className="w-5 h-5 text-slate-300" />
                           )}

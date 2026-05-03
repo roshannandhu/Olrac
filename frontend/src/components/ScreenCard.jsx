@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { Flame, MapPin, Monitor, TrendingUp, Zap } from 'lucide-react'
 
 import { SCREEN_PRICING_TIERS } from '../utils/screenPricing'
+import { getLocationPath } from '../utils/locationSlugs'
 
 export default function ScreenCard({ screen, index = 0 }) {
   const navigate = useNavigate()
@@ -9,7 +10,7 @@ export default function ScreenCard({ screen, index = 0 }) {
   const isTrending = screen.footfall > 10000 || false
 
   const handleBook = () => {
-    navigate(`/location/${screen.id}`)
+    navigate(getLocationPath(screen))
   }
 
   return (
@@ -22,6 +23,7 @@ export default function ScreenCard({ screen, index = 0 }) {
           <img
             src={screen.image_url}
             alt={screen.name}
+            loading="lazy"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (

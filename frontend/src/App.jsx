@@ -21,6 +21,7 @@ import AdminScreens from './pages/AdminScreens'
 import AdminSettings from './pages/AdminSettings'
 import { adminSiteUrl, isAdminSite } from './utils/siteMode'
 import { hasSeenIntroSplash, LOADER_DELAY_MS, LOADER_MIN_VISIBLE_MS } from './utils/displayExperience'
+import { applySeo, getSeoForPath } from './utils/seo'
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -28,6 +29,18 @@ function ScrollToTop() {
   useEffect(() => {
     if (navType !== 'POP') window.scrollTo(0, 0)
   }, [pathname, navType])
+  return null
+}
+
+function SeoManager() {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    if (isAdminSite) return
+    const meta = getSeoForPath(pathname)
+    if (meta) applySeo(meta)
+  }, [pathname])
+
   return null
 }
 
@@ -135,7 +148,7 @@ function ClientRoutes() {
 
       {/* Client - Locations */}
       <Route path="/locations" element={<Locations />} />
-      <Route path="/location/:screenId" element={<LocationDetail />} />
+      <Route path="/location/:screenSlug" element={<LocationDetail />} />
 
       {/* Client - Dashboard */}
       <Route path="/dashboard" element={<Navigate to="/locations" replace />} />
@@ -186,6 +199,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
+      <SeoManager />
       <ScrollToTop />
       <div className="min-h-screen flex flex-col bg-[#050508]">
         <AnimatePresence>

@@ -39,7 +39,7 @@ function VideoCard({ videos }) {
             onEnded={() => setIdx((p) => (p + 1) % videos.length)}
             className="h-full w-full object-cover" />
         ) : (
-          <img key={current} src={current} className="h-full w-full object-cover" alt="" />
+          <img key={current} src={current} loading="lazy" className="h-full w-full object-cover" alt="Premium advertising screen preview" />
         )}
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />

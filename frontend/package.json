@@ -7,8 +7,11 @@
     "dev": "vite --mode client",
     "dev:client": "vite --mode client",
     "dev:admin": "vite --mode admin",
+    "prebuild": "node scripts/generate-sitemap.mjs",
     "build": "vite build --mode client",
+    "prebuild:client": "node scripts/generate-sitemap.mjs",
     "build:client": "vite build --mode client",
+    "prebuild:admin": "node scripts/generate-sitemap.mjs",
     "build:admin": "vite build --mode admin",
     "preview": "vite preview --mode client",
     "preview:admin": "vite preview --mode admin"

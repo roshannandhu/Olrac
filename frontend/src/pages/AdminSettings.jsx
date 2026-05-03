@@ -990,7 +990,7 @@ export default function AdminSettings() {
                             {isVideo ? (
                               <video src={mediaUrl} className="h-12 w-16 rounded bg-black object-cover" />
                             ) : (
-                              <img src={mediaUrl} className="h-12 w-16 rounded bg-black object-cover" />
+                              <img src={mediaUrl} alt={`Homepage media ${index + 1}`} className="h-12 w-16 rounded bg-black object-cover" />
                             )}
                             <div className="flex-1 overflow-hidden">
                               <p className="truncate text-xs font-medium text-slate-700">Media {index + 1}</p>

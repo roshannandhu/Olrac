@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { AnimatePresence, motion } from 'framer-motion'
 import { pageTransition, staggerContainer, staggerItem } from '../utils/animations'
@@ -19,6 +19,8 @@ import {
 } from 'lucide-react'
 import api from '../api/axios'
 import { track } from '../utils/analytics'
+import { applySeo, DEFAULT_OG_IMAGE, SITE_URL } from '../utils/seo'
+import { getLocationPath, getLocationSlug, getScreenIdFromLocationParam } from '../utils/locationSlugs'
 
 const EASE_OUT = [0.0, 0.0, 0.2, 1.0]
 const HERO_FALLBACK_DESCRIPTION = 'Premium advertising inventory positioned in a high-attention area for long-duration brand visibility and stronger brand recall.'
@@ -254,7 +256,7 @@ function GalleryPanel({ screenName, mediaItems, selectedMediaUrl, onSelectMedia 
                     Your browser does not support the video tag.
                   </video>
                 ) : activeMedia?.url ? (
-                  <img src={activeMedia.url} alt={screenName} className="h-full w-full object-cover" />
+                  <img src={activeMedia.url} alt={`${screenName} advertising screen`} className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">
                     <Monitor className="h-16 w-16 text-slate-200" />
@@ -327,7 +329,7 @@ function GalleryPanel({ screenName, mediaItems, selectedMediaUrl, onSelectMedia 
                     {item.type === 'video' ? (
                       <>
                         {item.poster ? (
-                          <img src={item.poster} alt={`${screenName} video`} className="h-full w-full object-cover" />
+                          <img src={item.poster} alt={`${screenName} video preview`} loading="lazy" className="h-full w-full object-cover" />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center bg-slate-950">
                             <PlayCircle className="h-8 w-8 text-white/85" />
@@ -341,7 +343,7 @@ function GalleryPanel({ screenName, mediaItems, selectedMediaUrl, onSelectMedia 
                         </div>
                       </>
                     ) : (
-                      <img src={item.url} alt={`View ${index + 1}`} className="h-full w-full object-cover" />
+                      <img src={item.url} alt={`${screenName} gallery view ${index + 1}`} loading="lazy" className="h-full w-full object-cover" />
                     )}
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/70 to-transparent px-2 pb-2 pt-4 text-left">
                       <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/90">
@@ -369,7 +371,7 @@ function GalleryPanel({ screenName, mediaItems, selectedMediaUrl, onSelectMedia 
                     {item.type === 'video' ? (
                       <>
                         {item.poster ? (
-                          <img src={item.poster} alt={`${screenName} video`} className="h-full w-full object-cover" />
+                          <img src={item.poster} alt={`${screenName} video preview`} loading="lazy" className="h-full w-full object-cover" />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center bg-slate-950">
                             <PlayCircle className="h-8 w-8 text-white/85" />
@@ -383,7 +385,7 @@ function GalleryPanel({ screenName, mediaItems, selectedMediaUrl, onSelectMedia 
                         </div>
                       </>
                     ) : (
-                      <img src={item.url} alt={`View ${index + 1}`} className="h-full w-full object-cover" />
+                      <img src={item.url} alt={`${screenName} gallery view ${index + 1}`} loading="lazy" className="h-full w-full object-cover" />
                     )}
                   </button>
                 ))}
@@ -461,23 +463,64 @@ function MobileQuoteBar({ screen, price, onQuoteClick }) {
 }
 
 export default function LocationDetail() {
-  const { screenId } = useParams()
+  const { screenSlug } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [screen, setScreen] = useState(null)
   const [loading, setLoading] = useState(true)
   const [selectedMediaUrl, setSelectedMediaUrl] = useState('')
 
   useEffect(() => {
-    api.get(`/screens/${screenId}`)
-      .then((res) => {
-        setScreen(res.data)
-      })
-      .catch(() => {
+    let isMounted = true
+
+    const loadScreen = async () => {
+      setLoading(true)
+      try {
+        const screenId = getScreenIdFromLocationParam(screenSlug)
+        let nextScreen
+
+        if (screenId) {
+          const res = await api.get(`/screens/${screenId}`)
+          nextScreen = res.data
+        } else {
+          const res = await api.get('/screens')
+          nextScreen = (Array.isArray(res.data) ? res.data : []).find((item) => getLocationSlug(item) === screenSlug)
+        }
+
+        if (!nextScreen) throw new Error('Screen not found')
+        if (isMounted) setScreen(nextScreen)
+      } catch {
+        if (!isMounted) return
         toast.error('Location not found')
         navigate('/locations')
-      })
-      .finally(() => setLoading(false))
-  }, [screenId, navigate])
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    }
+
+    loadScreen()
+    return () => { isMounted = false }
+  }, [screenSlug, navigate])
+
+  useEffect(() => {
+    if (!screen) return
+
+    const canonicalPath = getLocationPath(screen)
+    const image = screen.image_url
+      ? (/^https?:\/\//i.test(screen.image_url) ? screen.image_url : `${SITE_URL}${screen.image_url}`)
+      : DEFAULT_OG_IMAGE
+
+    applySeo({
+      title: `${screen.name} Advertising Screen - OLRAC Advertise`,
+      description: `Book the ${screen.name} advertising screen in ${screen.area}. View pricing, availability, media, and get an instant OLRAC Advertise quotation.`,
+      path: canonicalPath,
+      image,
+    })
+
+    if (location.pathname !== canonicalPath) {
+      navigate(canonicalPath, { replace: true })
+    }
+  }, [screen, location.pathname, navigate])
 
   const galleryMedia = useMemo(() => {
     return buildScreenGalleryMedia(screen)
@@ -578,7 +621,7 @@ export default function LocationDetail() {
             animate={{ scale: 1 }}
             transition={{ duration: 1.4, ease: EASE_OUT }}
             src={screen.image_url}
-            alt=""
+            alt={`${screen.name} advertising screen in ${screen.area}`}
             className="absolute inset-0 h-full w-full object-cover opacity-45 sm:opacity-35 lg:opacity-25"
           />
         ) : null}

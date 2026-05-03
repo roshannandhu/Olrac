@@ -65,7 +65,8 @@ export function DigitalBillboard({ mediaUrls = [] }) {
                   <img
                     key={`img-${currentIndex}-${currentMedia}`}
                     src={currentMedia}
-                    alt="Ad content"
+                    alt="Digital ad content displayed on an OLRAC screen"
+                    loading="lazy"
                     className="h-full w-full object-cover animate-ken-burns"
                   />
                 )}

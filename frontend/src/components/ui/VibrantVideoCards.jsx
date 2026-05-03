@@ -44,7 +44,7 @@ function VideoPlayer({ videos }) {
           className="h-full w-full object-cover"
         />
       ) : (
-        <img key={current} src={current} className="h-full w-full object-cover" alt="" />
+        <img key={current} src={current} loading="lazy" className="h-full w-full object-cover" alt="Advertising screen campaign preview" />
       )}
 
       {videos.length > 1 && (

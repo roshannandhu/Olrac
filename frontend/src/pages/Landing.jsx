@@ -114,7 +114,7 @@ function VideoCard({ videos }) {
             onEnded={() => setIdx((p) => (p + 1) % videos.length)}
             className="h-full w-full object-cover" />
         ) : (
-          <img key={current} src={current} className="h-full w-full object-cover" alt="" />
+          <img key={current} src={current} loading="lazy" className="h-full w-full object-cover" alt="Digital advertising screen preview" />
         )}
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
@@ -361,7 +361,7 @@ export default function Landing() {
           style={{ y: heroBgY, scale: heroScale }}
           className="absolute inset-0 z-0"
         >
-          <img src="/hero.jpeg" alt="" className="h-full w-full object-cover object-center opacity-[0.38]" />
+          <img src="/hero.jpeg" alt="OLRAC Advertise digital screen advertising network" className="h-full w-full object-cover object-center opacity-[0.38]" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050508]/55 via-[#050508]/20 to-[#050508]" />
         </motion.div>
 
@@ -392,7 +392,9 @@ export default function Landing() {
                 {appName}
               </motion.div>
 
-              <motion.h1
+              <motion.div
+                role="heading"
+                aria-level="1"
                 initial={{ opacity: 0, y: 22 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.08 }}
@@ -410,7 +412,7 @@ export default function Landing() {
                 >
                   where the city already looks at an affordable price.
                 </span>
-              </motion.h1>
+              </motion.div>
 
               <motion.p
                 initial={{ opacity: 0, y: 14 }}

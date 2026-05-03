@@ -34,6 +34,7 @@ import { getSelectedBookingDuration, normalizeBookingDurations, resolveDefaultBo
 import { track } from '../utils/analytics'
 import { DEFAULT_WHATSAPP_TEMPLATE, fillWhatsAppTemplate } from '../utils/whatsappTemplate'
 import { pageTransition } from '../utils/animations'
+import { getLocationPath } from '../utils/locationSlugs'
 
 const EASE_OUT = [0.0, 0.0, 0.2, 1.0]
 
@@ -152,7 +153,7 @@ function LocationCard({ screen, selected, onToggle, onViewLocation, currentSlots
         {/* Image */}
         <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
           {screen.image_url ? (
-            <img src={screen.image_url} alt={screen.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            <img src={screen.image_url} alt={screen.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
           ) : (
             <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
               <Monitor className="h-10 w-10 text-slate-300" />
@@ -613,9 +614,11 @@ export default function Booking() {
               {stage === 'confirmed' ? <Home className="h-4 w-4" /> : <ArrowLeft className="h-4 w-4" />}
             </button>
             <div>
-              <p className="text-base font-black text-slate-900">
-                {stage === 'confirmed' ? 'Booking Confirmed' : 'Configure Quotation'}
-              </p>
+              {stage === 'confirmed' ? (
+                <p className="text-base font-black text-slate-900">Booking Confirmed</p>
+              ) : (
+                <h1 className="text-base font-black text-slate-900">Book Digital Advertising Screens</h1>
+              )}
               <p className="text-[11px] text-slate-400">
                 {stage === 'confirmed' ? `OLRAC${bookingInfo?.id}` : stage === 'select' ? 'Step 1 of 2 — Choose Locations' : 'Step 2 of 2 — Campaign Details'}
               </p>
@@ -844,7 +847,7 @@ export default function Booking() {
                           screen={screen}
                           selected={selectedIds.includes(screen.id)}
                           onToggle={toggleLocation}
-                          onViewLocation={(screenId) => navigate(`/location/${screenId}`)}
+                          onViewLocation={() => navigate(getLocationPath(screen))}
                           currentSlots={slotQuantities[screen.id] || 1}
                           onSlotsChange={handleSlotQuantityChange}
                         />

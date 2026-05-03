@@ -10,6 +10,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { track } from '../utils/analytics'
+import { getLocationPath } from '../utils/locationSlugs'
 
 const EASE_OUT = [0.0, 0.0, 0.2, 1.0]
 
@@ -78,6 +79,7 @@ function ScreenCard({ screen, isActive, isHovered, onFocus, onView, onMouseEnter
           <img
             src={screen.image_url}
             alt={screen.name}
+            loading="lazy"
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
         ) : (
@@ -157,6 +159,7 @@ function MobileScreenCard({ screen, isActive, onFocus, cardRef }) {
           <img
             src={screen.image_url}
             alt={screen.name}
+            loading="lazy"
             className="h-full w-full object-cover transition-transform duration-700 group-active:scale-105"
           />
         ) : (
@@ -292,11 +295,14 @@ export default function Locations() {
       .finally(() => setLoading(false))
   }, [])
 
-  const filtered = screens.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.area.toLowerCase().includes(search.toLowerCase()) ||
-    (s.description || '').toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = useMemo(() => {
+    const query = search.toLowerCase()
+    return screens.filter(s =>
+      s.name.toLowerCase().includes(query) ||
+      s.area.toLowerCase().includes(query) ||
+      (s.description || '').toLowerCase().includes(query)
+    )
+  }, [screens, search])
 
   const mapLocations = useMemo(() => filtered.map(s => {
     const lat = Number(s.latitude)
@@ -631,7 +637,7 @@ export default function Locations() {
                                 <p className="text-sm font-bold text-slate-900">{loc.name}</p>
                                 <p className="mt-1 text-xs text-slate-500">{loc.area}</p>
                                 <button
-                                  onClick={() => navigate(`/location/${loc.id}`)}
+                                  onClick={() => navigate(getLocationPath(loc))}
                                   className="mt-3 inline-flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-violet-700"
                                 >
                                   View Location
@@ -752,7 +758,7 @@ export default function Locations() {
                                 <p className="text-sm font-bold text-slate-900">{loc.name}</p>
                                 <p className="mt-1 text-xs text-slate-500">{loc.area}</p>
                                 <button
-                                  onClick={() => navigate(`/location/${loc.id}`)}
+                                  onClick={() => navigate(getLocationPath(loc))}
                                   className="mt-3 inline-flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-violet-700"
                                 >
                                   View Location
@@ -789,7 +795,7 @@ export default function Locations() {
                           onFocus={() => focusOnLocation(mapLocations.find(l => l.id === screen.id))}
                           onView={() => {
                             track('screen_viewed', { screen_id: screen.id, screen_name: screen.name, area: screen.area })
-                            navigate(`/location/${screen.id}`)
+                            navigate(getLocationPath(screen))
                           }}
                         />
                       ))}
@@ -809,7 +815,7 @@ export default function Locations() {
             screen={activeMobileScreen}
             onBook={() => {
               track('screen_viewed', { screen_id: activeMobileScreen.id, screen_name: activeMobileScreen.name, area: activeMobileScreen.area })
-              navigate(`/location/${activeMobileScreen.id}`)
+              navigate(getLocationPath(activeMobileScreen))
             }}
             onDismiss={() => { setActiveId(null); setFocusVersion(p => p + 1) }}
           />
