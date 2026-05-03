@@ -99,7 +99,7 @@ export default function Navbar() {
             {logoUrl ? (
               <img
                 src={logoUrl}
-                alt={appName}
+                alt={`${appName} logo`}
                 className={`${isAdminSite ? 'h-10 w-10' : 'h-12 w-12 md:h-14 md:w-14'} rounded-2xl object-contain shrink-0 transition-all duration-300 group-hover:scale-105`}
                 style={{
                   imageRendering: '-webkit-optimize-contrast',

@@ -11,6 +11,8 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { track } from '../utils/analytics'
 import { getLocationPath } from '../utils/locationSlugs'
+import Seo from '../components/Seo'
+import { PAGE_SEO } from '../utils/seo'
 
 const EASE_OUT = [0.0, 0.0, 0.2, 1.0]
 
@@ -78,7 +80,7 @@ function ScreenCard({ screen, isActive, isHovered, onFocus, onView, onMouseEnter
         {screen.image_url ? (
           <img
             src={screen.image_url}
-            alt={screen.name}
+            alt={`${screen.name} advertising screen in ${screen.area}`}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
@@ -158,7 +160,7 @@ function MobileScreenCard({ screen, isActive, onFocus, cardRef }) {
         {screen.image_url ? (
           <img
             src={screen.image_url}
-            alt={screen.name}
+            alt={`${screen.name} advertising screen in ${screen.area}`}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-700 group-active:scale-105"
           />
@@ -321,6 +323,19 @@ export default function Locations() {
     () => [...new Set(filtered.map(screen => screen.area).filter(Boolean))].slice(0, 4),
     [filtered],
   )
+  const seoCities = useMemo(
+    () => [...new Set(screens.map(screen => screen.area).filter(Boolean))].slice(0, 3),
+    [screens],
+  )
+  const locationsSeo = useMemo(() => {
+    const cityText = seoCities.length ? seoCities.join(', ') : 'Calicut, Kochi and India'
+    return {
+      ...PAGE_SEO['/locations'],
+      title: `Advertising Screens in ${cityText} | OLRAC Advertise`,
+      description: `Explore advertising screens in ${cityText}. Compare LED ads, TV screen slots, and digital advertising locations with OLRAC Advertise.`,
+      keywords: `Advertising Screens in ${cityText}, LED Ads in Kochi, digital ad locations India, TV screen advertising Kerala`,
+    }
+  }, [seoCities])
   const activeMobileScreen = useMemo(() => filtered.find(s => s.id === activeId) || null, [filtered, activeId])
 
   const focusOnLocation = (loc) => {
@@ -350,6 +365,8 @@ export default function Locations() {
       exit="exit"
       className="min-h-screen bg-[#f8f8fb]"
     >
+      <Seo meta={locationsSeo} />
+
       {/* â”€â”€ Hero / Search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="relative overflow-hidden bg-[linear-gradient(135deg,#f5fbff_0%,#eef4ff_46%,#fff4e6_100%)]">
         <div className="pointer-events-none absolute inset-0">

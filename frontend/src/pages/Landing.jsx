@@ -16,6 +16,7 @@ import {
 import { usePublicSettings } from '../context/PublicSettingsContext'
 import { track } from '../utils/analytics'
 import api from '../api/axios'
+import Seo from '../components/Seo'
 import IntroSplash from '../components/IntroSplash'
 import { TiltCard } from '../components/ui/TiltCard'
 import { DigitalBillboard } from '../components/ui/DigitalBillboard'
@@ -25,6 +26,7 @@ import {
   fadeUp, pageTransition, btnBounce, staggerContainer, staggerContainerSlow,
   staggerItem, sectionReveal, float, tiltIn, cascadeItem, blurReveal,
 } from '../utils/animations'
+import { PAGE_SEO } from '../utils/seo'
 
 const EASE_OUT = [0.0, 0.0, 0.2, 1.0]
 
@@ -328,6 +330,7 @@ export default function Landing() {
       exit="exit"
       className="min-h-screen bg-[#050508]"
     >
+      <Seo meta={PAGE_SEO['/']} />
       <IntroSplash companyName={appName} />
 
       {/* ── FLOATING CTA PILL ──────────────────────────────────── */}
@@ -1078,7 +1081,7 @@ export default function Landing() {
                         {item.image_url ? (
                           <img
                             src={item.image_url}
-                            alt={item.name}
+                            alt={`${item.name} brand logo`}
                             loading="lazy"
                             className="max-h-full max-w-full object-contain mix-blend-multiply transition duration-500 group-hover:scale-105"
                           />

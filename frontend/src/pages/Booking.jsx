@@ -35,6 +35,8 @@ import { track } from '../utils/analytics'
 import { DEFAULT_WHATSAPP_TEMPLATE, fillWhatsAppTemplate } from '../utils/whatsappTemplate'
 import { pageTransition } from '../utils/animations'
 import { getLocationPath } from '../utils/locationSlugs'
+import Seo from '../components/Seo'
+import { PAGE_SEO } from '../utils/seo'
 
 const EASE_OUT = [0.0, 0.0, 0.2, 1.0]
 
@@ -153,7 +155,7 @@ function LocationCard({ screen, selected, onToggle, onViewLocation, currentSlots
         {/* Image */}
         <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
           {screen.image_url ? (
-            <img src={screen.image_url} alt={screen.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            <img src={screen.image_url} alt={`${screen.name} advertising screen in ${screen.area}`} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
           ) : (
             <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
               <Monitor className="h-10 w-10 text-slate-300" />
@@ -602,6 +604,8 @@ export default function Booking() {
       exit="exit"
       className="min-h-screen bg-[#f8f8fb] pb-32 lg:pb-24"
     >
+      <Seo meta={PAGE_SEO['/booking']} />
+
       {/* ── Sticky Header ─────────────────────────── */}
       <div className="sticky top-0 z-30 border-b border-slate-200/60 bg-white/95 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-[68px]">

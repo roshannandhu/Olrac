@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Routes, Route, Navigate, useLocation, useNavigationType } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { useAuth } from './context/auth-context'
 import { AnimatePresence } from 'framer-motion'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoadingScreen from './components/LoadingScreen'
+import Seo from './components/Seo'
 
 // Pages
 import Landing from './pages/Landing'
@@ -21,7 +22,6 @@ import AdminScreens from './pages/AdminScreens'
 import AdminSettings from './pages/AdminSettings'
 import { adminSiteUrl, isAdminSite } from './utils/siteMode'
 import { hasSeenIntroSplash, LOADER_DELAY_MS, LOADER_MIN_VISIBLE_MS } from './utils/displayExperience'
-import { applySeo, getSeoForPath } from './utils/seo'
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -29,18 +29,6 @@ function ScrollToTop() {
   useEffect(() => {
     if (navType !== 'POP') window.scrollTo(0, 0)
   }, [pathname, navType])
-  return null
-}
-
-function SeoManager() {
-  const { pathname } = useLocation()
-
-  useEffect(() => {
-    if (isAdminSite) return
-    const meta = getSeoForPath(pathname)
-    if (meta) applySeo(meta)
-  }, [pathname])
-
   return null
 }
 
@@ -80,8 +68,18 @@ class ErrorBoundary extends React.Component {
 }
 
 function NotFound() {
+  const location = useLocation()
+
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
+      <Seo
+        meta={{
+          title: 'Page Not Found | OLRAC Advertise',
+          description: 'The requested OLRAC Advertise page could not be found.',
+          path: location.pathname,
+          robots: 'noindex,nofollow',
+        }}
+      />
       <div className="text-center">
         <h1 className="text-6xl font-bold text-gray-200 mb-4">404</h1>
         <p className="text-gray-500">Page not found</p>
@@ -95,6 +93,19 @@ function ExternalRedirect({ to }) {
   if (typeof window !== 'undefined') {
     window.location.replace(to)
   }
+
+  return null
+}
+
+function LegacyLocationRedirect() {
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const screenId = params.get('id')
+    navigate(screenId ? `/location/${screenId}` : '/locations', { replace: true })
+  }, [location.search, navigate])
 
   return null
 }
@@ -148,6 +159,7 @@ function ClientRoutes() {
 
       {/* Client - Locations */}
       <Route path="/locations" element={<Locations />} />
+      <Route path="/location" element={<LegacyLocationRedirect />} />
       <Route path="/location/:screenSlug" element={<LocationDetail />} />
 
       {/* Client - Dashboard */}
@@ -199,7 +211,6 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <SeoManager />
       <ScrollToTop />
       <div className="min-h-screen flex flex-col bg-[#050508]">
         <AnimatePresence>

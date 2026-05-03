@@ -22,7 +22,7 @@ export default function ScreenCard({ screen, index = 0 }) {
         {screen.image_url ? (
           <img
             src={screen.image_url}
-            alt={screen.name}
+            alt={`${screen.name} advertising screen in ${screen.area}`}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />

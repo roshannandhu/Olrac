@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { HelmetProvider } from 'react-helmet-async'
 import { Toaster } from 'react-hot-toast'
 import posthog from 'posthog-js'
 import App from './App'
@@ -46,30 +47,32 @@ const dismissBootLoader = () => {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <BrowserRouter>
-    <AuthProvider>
-      <PublicSettingsProvider>
-        <App />
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#fff',
-              color: '#1e1e2e',
-              borderRadius: '12px',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
-              padding: '14px 20px',
-              fontSize: '14px',
-            },
-            success: {
-              iconTheme: { primary: '#7c3aed', secondary: '#fff' },
-            },
-          }}
-        />
-      </PublicSettingsProvider>
-    </AuthProvider>
-  </BrowserRouter>
+  <HelmetProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <PublicSettingsProvider>
+          <App />
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#fff',
+                color: '#1e1e2e',
+                borderRadius: '12px',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
+                padding: '14px 20px',
+                fontSize: '14px',
+              },
+              success: {
+                iconTheme: { primary: '#7c3aed', secondary: '#fff' },
+              },
+            }}
+          />
+        </PublicSettingsProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  </HelmetProvider>
 )
 
 requestAnimationFrame(() => {

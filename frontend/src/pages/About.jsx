@@ -15,6 +15,8 @@ import { useNavigate } from 'react-router-dom'
 import { usePublicSettings } from '../context/PublicSettingsContext'
 import { motion, useInView } from 'framer-motion'
 import { pageTransition } from '../utils/animations'
+import Seo from '../components/Seo'
+import { PAGE_SEO } from '../utils/seo'
 
 function Counter({ to, prefix = '', suffix = '', duration = 1.8 }) {
   const [val, setVal] = useState(0)
@@ -107,6 +109,7 @@ export default function About() {
       exit="exit"
       className="min-h-screen bg-white"
     >
+      <Seo meta={PAGE_SEO['/about']} />
 
       {/* ── HERO ─────────────────────────────────────────────── */}
       <section className="bg-white pt-14 pb-12 sm:pt-20 sm:pb-16 border-b border-slate-100">

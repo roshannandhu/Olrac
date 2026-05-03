@@ -30,7 +30,7 @@ export default function Footer() {
             <Link to="/" className="inline-flex items-center gap-3 group mb-5">
               <div className="w-10 h-10 rounded-2xl bg-blue-700/80 border border-blue-600/30 flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform">
                 {logoUrl
-                  ? <img src={logoUrl} alt={appName} className="w-full h-full object-cover" />
+                  ? <img src={logoUrl} alt={`${appName} logo`} className="w-full h-full object-cover" />
                   : <Monitor className="w-5 h-5 text-white" />
                 }
               </div>

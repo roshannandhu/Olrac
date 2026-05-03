@@ -19,7 +19,8 @@ import {
 } from 'lucide-react'
 import api from '../api/axios'
 import { track } from '../utils/analytics'
-import { applySeo, DEFAULT_OG_IMAGE, SITE_URL } from '../utils/seo'
+import Seo from '../components/Seo'
+import { absoluteUrl, DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL } from '../utils/seo'
 import { getLocationPath, getLocationSlug, getScreenIdFromLocationParam } from '../utils/locationSlugs'
 
 const EASE_OUT = [0.0, 0.0, 0.2, 1.0]
@@ -506,17 +507,6 @@ export default function LocationDetail() {
     if (!screen) return
 
     const canonicalPath = getLocationPath(screen)
-    const image = screen.image_url
-      ? (/^https?:\/\//i.test(screen.image_url) ? screen.image_url : `${SITE_URL}${screen.image_url}`)
-      : DEFAULT_OG_IMAGE
-
-    applySeo({
-      title: `${screen.name} Advertising Screen - OLRAC Advertise`,
-      description: `Book the ${screen.name} advertising screen in ${screen.area}. View pricing, availability, media, and get an instant OLRAC Advertise quotation.`,
-      path: canonicalPath,
-      image,
-    })
-
     if (location.pathname !== canonicalPath) {
       navigate(canonicalPath, { replace: true })
     }
@@ -599,6 +589,37 @@ export default function LocationDetail() {
       gradient: 'linear-gradient(135deg, #4f46e5, #2563eb)',
     },
   ]
+  const canonicalPath = getLocationPath(screen)
+  const seoImage = screen.image_url ? absoluteUrl(screen.image_url) : DEFAULT_OG_IMAGE
+  const areaKeyword = screen.area || 'India'
+  const locationSeo = {
+    title: `${screen.name} Advertising Screen in ${areaKeyword} | OLRAC Advertise`,
+    description: `Book the ${screen.name} advertising screen in ${areaKeyword}. View pricing, availability, media, and get an instant OLRAC Advertise quotation.`,
+    path: canonicalPath,
+    image: seoImage,
+    keywords: `Advertising Screens in ${areaKeyword}, LED Ads in ${areaKeyword}, ${screen.name}, TV screen advertising India`,
+  }
+  const locationStructuredData = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: screen.name,
+      description: heroDescription,
+      image: seoImage,
+      areaServed: areaKeyword,
+      brand: {
+        '@type': 'Brand',
+        name: SITE_NAME,
+      },
+      offers: {
+        '@type': 'Offer',
+        priceCurrency: 'INR',
+        price: selectedPlanPrice,
+        availability: available > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        url: `${SITE_URL}${canonicalPath}`,
+      },
+    },
+  ]
 
   const handleBrowseLocations = () => navigate('/locations')
   const handleQuoteClick = () => {
@@ -614,6 +635,8 @@ export default function LocationDetail() {
       exit="exit"
       className="min-h-screen bg-[#f8f8fb]"
     >
+      <Seo meta={locationSeo} structuredData={locationStructuredData} />
+
       <section className="relative overflow-hidden bg-[#050508]">
         {screen.image_url ? (
           <motion.img
